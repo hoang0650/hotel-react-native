@@ -322,6 +322,80 @@ export interface Invoice {
   [key: string]: any;
 }
 
+// Guest Types
+export interface GuestPersonalInfo {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  dateOfBirth?: Date | string;
+  gender?: 'male' | 'female' | 'other';
+  nationality?: string;
+  idType?: 'passport' | 'id_card' | 'driver_license';
+  idNumber?: string;
+  idExpiryDate?: Date | string;
+  idScanUrl?: string;
+}
+
+export interface GuestContactInfo {
+  email?: string;
+  phone?: string;
+  alternativePhone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+  };
+}
+
+export interface GuestPreferences {
+  roomType?: string;
+  floor?: string;
+  specialRequests?: string[];
+  dietaryRestrictions?: string[];
+}
+
+export interface GuestStayHistory {
+  bookingId?: string;
+  checkInDate?: Date | string;
+  checkOutDate?: Date | string;
+  roomNumber?: string;
+  totalSpent?: number;
+  rating?: number;
+  feedback?: string;
+}
+
+export interface Guest {
+  _id?: string;
+  userId?: string;
+  hotelId: string | { _id: string; name?: string; [key: string]: any };
+  businessId?: string | { _id: string; name?: string; [key: string]: any };
+  guestType?: 'regular' | 'frequent' | 'group';
+  isGroupLeader?: boolean;
+  groupId?: string;
+  groupMembers?: string[];
+  groupSize?: number;
+  personalInfo?: GuestPersonalInfo;
+  contactInfo?: GuestContactInfo;
+  preferences?: GuestPreferences;
+  stayHistory?: GuestStayHistory[];
+  loyaltyPoints?: number;
+  loyaltyTier?: 'standard' | 'silver' | 'gold' | 'platinum';
+  notes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  metadata?: any;
+}
+
+export interface GuestQuery {
+  hotelId?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+  guestType?: 'regular' | 'frequent' | 'group';
+}
+
 // Staff Types
 export interface StaffPersonalInfo {
   firstName: string;
