@@ -1,50 +1,143 @@
-# Welcome to your Expo app 👋
+# Hotel Management React Native App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Ứng dụng React Native cho hệ thống quản lý khách sạn, đồng bộ với Angular web app và NestJS backend.
 
-## Get started
+## Cấu trúc dự án
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+hotelapp-react-native/
+├── app/                    # Expo Router screens
+│   ├── (auth)/            # Authentication screens
+│   │   └── login.tsx      # Login screen
+│   └── (tabs)/            # Main app tabs
+│       ├── index.tsx      # Home/Dashboard
+│       └── rooms.tsx      # Rooms list
+├── components/             # Reusable components
+├── constants/             # Constants và config
+│   └── api.ts            # API endpoints
+├── contexts/              # React contexts
+│   └── AuthContext.tsx    # Authentication context
+├── hooks/                 # Custom hooks
+├── services/              # API services
+│   ├── api.ts            # Base API service
+│   ├── auth.service.ts   # Authentication service
+│   ├── rooms.service.ts  # Rooms service
+│   └── hotels.service.ts # Hotels service
+└── types/                 # TypeScript types
+    └── index.ts          # Type definitions
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Cài đặt
 
-## Learn more
+1. Cài đặt dependencies:
+```bash
+npm install
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+2. Cài đặt AsyncStorage (nếu chưa có):
+```bash
+npx expo install @react-native-async-storage/async-storage
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3. Chạy ứng dụng:
+```bash
+npm start
+# hoặc
+npx expo start
+```
 
-## Join the community
+## Tính năng
 
-Join our community of developers creating universal apps.
+### Đã triển khai:
+- ✅ Authentication (Login/Logout)
+- ✅ API service base với token management
+- ✅ Rooms service với đầy đủ methods
+- ✅ Hotels service
+- ✅ Auth context và protected routes
+- ✅ Rooms list screen
+- ✅ Home/Dashboard screen
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Cần triển khai thêm:
+- Room detail screen
+- Check-in/Check-out screens
+- Booking modal
+- Calendar view
+- Financial reports
+- Settings
+- Notifications
+
+## API Endpoints
+
+Tất cả endpoints được định nghĩa trong `constants/api.ts` và sử dụng base URL:
+- Base URL: `https://nest-production-8106.up.railway.app`
+- API Prefix: `/api`
+
+### Authentication
+- `POST /api/users/login` - Đăng nhập
+- `POST /api/users/logout` - Đăng xuất
+
+### Rooms
+- `GET /api/rooms` - Lấy danh sách phòng
+- `GET /api/rooms/:id` - Lấy thông tin phòng
+- `POST /api/rooms/checkin/:id` - Check-in phòng
+- `POST /api/rooms/checkout/:id` - Check-out phòng
+- `POST /api/rooms/booking` - Đặt phòng
+- `POST /api/rooms/booking/cancel/:id` - Hủy đặt phòng
+- `GET /api/rooms/bookings` - Lấy danh sách bookings
+
+## Cấu trúc Services
+
+### ApiService (Base)
+- Xử lý authentication headers tự động
+- Error handling
+- Request/Response interceptors
+
+### AuthService
+- Login/Logout
+- Token management
+- User state management
+- Role checking methods
+
+### RoomsService
+- getRooms() - Lấy danh sách phòng
+- getRoomById() - Lấy thông tin phòng
+- checkInRoom() - Check-in
+- checkOutRoom() - Check-out
+- createBooking() - Đặt phòng
+- cancelBooking() - Hủy đặt phòng
+- getBookings() - Lấy bookings
+
+## Navigation
+
+Ứng dụng sử dụng Expo Router với file-based routing:
+- `/(auth)/login` - Màn hình đăng nhập
+- `/(tabs)/` - Main app với tabs
+  - `/(tabs)/index` - Home
+  - `/(tabs)/rooms` - Rooms list
+
+## Authentication Flow
+
+1. User login → AuthService.login()
+2. Token được lưu vào AsyncStorage
+3. User data được lưu vào AuthContext
+4. Protected routes tự động redirect nếu chưa login
+5. Logout → Clear token và redirect về login
+
+## Development
+
+### Thêm service mới:
+1. Tạo file trong `services/`
+2. Import `apiService` từ `services/api.ts`
+3. Sử dụng các methods: `get`, `post`, `put`, `delete`, `patch`
+
+### Thêm screen mới:
+1. Tạo file trong `app/` theo cấu trúc routing của Expo
+2. Sử dụng `useAuth()` hook để truy cập user data
+3. Sử dụng các services để fetch data
+
+## Notes
+
+- Tất cả API calls tự động thêm Authorization header nếu có token
+- Token được lưu trong AsyncStorage
+- Error handling được xử lý ở ApiService level
+- Types được định nghĩa trong `types/index.ts`
