@@ -30,8 +30,23 @@ const MAPPING = {
   'pencil': 'edit',
   'trash': 'delete',
   'plus.circle.fill': 'add-circle',
+  'plus': 'add',
   'xmark': 'close',
   'file-pdf': 'picture-as-pdf',
+  'doc.text.fill': 'description',
+  'tag': 'local-offer',
+  'receipt.fill': 'receipt',
+  'creditcard.fill': 'credit-card',
+  'magnifyingglass': 'search',
+  'arrow.clockwise': 'refresh',
+  'square.and.arrow.up': 'file-upload',
+  'bell.fill': 'notifications',
+  'bell': 'notifications-outline',
+  'check-circle': 'check-circle',
+  'sync': 'sync',
+  'build': 'build',
+  'info': 'info',
+  'warning': 'warning',
 } as IconMapping;
 
 /**

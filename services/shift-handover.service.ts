@@ -118,6 +118,28 @@ class ShiftHandoverService {
 
     return await apiService.get(`/shift-handover/stats?${params.toString()}`);
   }
+
+  async getCheckinCountByPeriod(
+    hotelId: string,
+    period: 'day' | 'week' | 'month',
+    startDate?: string,
+    endDate?: string
+  ): Promise<{
+    labels: string[];
+    checkinCountData: number[];
+    totalCheckins: number;
+    period: string;
+    startDate: string;
+    endDate: string;
+  }> {
+    const params = new URLSearchParams();
+    params.append('hotelId', hotelId);
+    params.append('period', period);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    return await apiService.get(`/shift-handover/checkin-count/period?${params.toString()}`);
+  }
 }
 
 export const shiftHandoverService = new ShiftHandoverService();

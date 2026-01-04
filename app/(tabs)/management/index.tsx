@@ -25,13 +25,6 @@ export default function ManagementScreen() {
 
   const managementItems: ManagementItem[] = [
     {
-      id: 'calendar',
-      title: 'Calendar Management',
-      description: 'Quản lý lịch đặt phòng và booking',
-      icon: 'calendar',
-      route: 'calendar',
-    },
-    {
       id: 'service',
       title: 'Service Management',
       description: 'Quản lý dịch vụ khách sạn',
@@ -58,6 +51,13 @@ export default function ManagementScreen() {
       description: 'Quản lý thông tin khách hàng',
       icon: 'person.fill',
       route: 'guest',
+    },
+    {
+      id: 'debt',
+      title: 'Debt Management',
+      description: 'Quản lý công nợ khách hàng',
+      icon: 'receipt.fill',
+      route: 'debt',
     },
   ];
 

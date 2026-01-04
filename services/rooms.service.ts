@@ -77,6 +77,21 @@ export class RoomsService {
     return apiService.get<Room>(API_ENDPOINTS.ROOMS.BY_ID(id), params);
   }
 
+  async getEventsByHotelId(
+    hotelId: string,
+    options?: {
+      limit?: number;
+      skip?: number;
+      types?: string[];
+    }
+  ): Promise<any[]> {
+    const params: any = { hotelId };
+    if (options?.limit) params.limit = options.limit;
+    if (options?.skip) params.skip = options.skip;
+    if (options?.types) params.types = JSON.stringify(options.types);
+    return apiService.get<any[]>('/rooms/events', params);
+  }
+
   async getRoomEvents(
     roomId: string,
     options?: GetRoomEventsParams
@@ -201,8 +216,8 @@ export class RoomsService {
     hotelId: string,
     filterType?: string,
     page: number = 1,
-    limit: number = 20
-  ): Promise<{ history: BookingHistory[]; pagination?: any }> {
+    limit: number = 10
+  ): Promise<{ history: BookingHistory[]; pagination?: any; totalPages?: number; currentPage?: number; totalItems?: number }> {
     const params: any = { hotelId, page, limit };
     if (filterType) params.filterType = filterType;
     return apiService.get('/rooms/history', params);

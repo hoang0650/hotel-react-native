@@ -40,6 +40,8 @@ class ApiService {
         endpoint.startsWith('/hotels') ||
         endpoint.startsWith('/bookings') ||
         endpoint.startsWith('/services') ||
+        endpoint.startsWith('/guests') ||
+        endpoint.startsWith('/debts') ||
         endpoint.startsWith('/financial-summary') ||
         endpoint.startsWith('/businesses') ||
         endpoint.startsWith('/staffs') ||
@@ -51,7 +53,8 @@ class ApiService {
         endpoint.startsWith('/crypto') ||
         endpoint.startsWith('/transactions') ||
         endpoint.startsWith('/bank-transfers') ||
-        endpoint.startsWith('/files')) {
+        endpoint.startsWith('/files') ||
+        endpoint.startsWith('/api/settings')) {
       return API_CONFIG.BASE_URL + endpoint;
     }
     // Các endpoint khác (như /api/settings) thêm /api

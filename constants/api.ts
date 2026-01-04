@@ -63,5 +63,30 @@ export const API_ENDPOINTS = {
     CALCULATE_SALARY: (staffId: string) => `/staffs/${staffId}/calculate-salary`,
     PAY_SALARY: (staffId: string) => `/staffs/${staffId}/pay-salary`,
   },
+  GUESTS: {
+    BASE: '/guests',
+    BY_ID: (id: string) => `/guests/${id}`,
+    CREATE_BOOKING: (guestId: string) => `/guests/${guestId}/create-booking`,
+    ASSIGN_ROOM: (guestId: string) => `/guests/${guestId}/assign-room`,
+    FIND: '/guests/find',
+    BY_ROOM: (roomId: string) => `/guests/room/${roomId}`,
+    MERGE: '/guests/merge',
+  },
+  DEBTS: {
+    BASE: '/debts',
+    BY_ID: (id: string) => `/debts/${id}`,
+    SETTLE: (id: string) => `/debts/${id}/settle`,
+    LABELS: (id: string) => `/debts/${id}/labels`,
+  },
+  NOTIFICATIONS: {
+    BASE: '/api/settings/announcements',
+    BY_ID: (id: string) => `/api/settings/announcements/${id}`,
+    UNREAD_COUNT: '/api/settings/announcements/unread-count',
+    MARK_AS_READ: (id: string) => `/api/settings/announcements/${id}/read`,
+    MARK_ALL_AS_READ: '/api/settings/announcements/read-all',
+  },
+  SETTINGS: {
+    NOTIFICATION: '/api/settings/notification',
+  },
 };
 

@@ -1,35 +1,16 @@
 import { apiService } from './api';
+import { API_ENDPOINTS } from '@/constants/api';
 import { Guest, GuestQuery } from '@/types';
 
-export interface AssignGuestToRoomRequest {
-  guestId: string;
-  roomId: string;
-  checkInTime?: Date | string;
-  rateType?: string;
-  guestInfo?: any;
-}
-
-export interface CreateBookingForGuestRequest {
-  roomId: string;
-  checkInDate: Date | string;
-  checkOutDate?: Date | string;
-  rateType?: 'hourly' | 'daily' | 'nightly';
-  advancePayment?: number;
-  notes?: string;
-  adults?: number;
-  children?: number;
-}
-
-export class GuestService {
+export class GuestsService {
   async getGuests(query?: GuestQuery): Promise<{ guests: Guest[]; total: number }> {
     const params: any = {};
-    
     if (query?.hotelId) params.hotelId = query.hotelId;
     if (query?.page) params.page = query.page;
     if (query?.limit) params.limit = query.limit;
     if (query?.search) params.search = query.search;
     if (query?.guestType) params.guestType = query.guestType;
-    
+
     return apiService.get<{ guests: Guest[]; total: number }>('/guests', params);
   }
 
@@ -49,18 +30,49 @@ export class GuestService {
     return apiService.delete<{ message: string }>(`/guests/${id}`);
   }
 
-  async createBookingForGuest(guestId: string, request: CreateBookingForGuestRequest): Promise<any> {
-    return apiService.post<any>(`/guests/${guestId}/create-booking`, {
+  async createBookingForGuest(
+    guestId: string,
+    request: {
+      roomId: string;
+      checkInDate: Date | string;
+      checkOutDate?: Date | string;
+      rateType?: 'hourly' | 'daily' | 'nightly';
+      advancePayment?: number;
+      notes?: string;
+      adults?: number;
+      children?: number;
+    }
+  ): Promise<any> {
+    return apiService.post(`/guests/${guestId}/create-booking`, {
       ...request,
-      checkInDate: typeof request.checkInDate === 'string' ? request.checkInDate : request.checkInDate.toISOString(),
-      checkOutDate: request.checkOutDate ? (typeof request.checkOutDate === 'string' ? request.checkOutDate : request.checkOutDate.toISOString()) : undefined,
+      checkInDate:
+        typeof request.checkInDate === 'string'
+          ? request.checkInDate
+          : request.checkInDate.toISOString(),
+      checkOutDate: request.checkOutDate
+        ? typeof request.checkOutDate === 'string'
+          ? request.checkOutDate
+          : request.checkOutDate.toISOString()
+        : undefined,
     });
   }
 
-  async assignGuestToRoom(guestId: string, request: AssignGuestToRoomRequest): Promise<any> {
-    return apiService.post<any>(`/guests/${guestId}/assign-room`, {
+  async assignGuestToRoom(
+    guestId: string,
+    request: {
+      roomId: string;
+      checkInTime?: Date | string;
+      rateType?: string;
+      guestInfo?: any;
+    }
+  ): Promise<any> {
+    return apiService.post(`/guests/${guestId}/assign-room`, {
       ...request,
-      checkInTime: request.checkInTime ? (typeof request.checkInTime === 'string' ? request.checkInTime : request.checkInTime.toISOString()) : undefined,
+      checkInTime: request.checkInTime
+        ? typeof request.checkInTime === 'string'
+          ? request.checkInTime
+          : request.checkInTime.toISOString()
+        : undefined,
     });
   }
 
@@ -80,5 +92,5 @@ export class GuestService {
   }
 }
 
-export const guestService = new GuestService();
+export const guestsService = new GuestsService();
 

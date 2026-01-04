@@ -21,10 +21,18 @@ export default function RoomHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset về trang 1 khi filter thay đổi
+  }, [selectedRoomId]);
 
   useEffect(() => {
     loadHistory();
-  }, [user, selectedRoomId]);
+  }, [user, selectedRoomId, currentPage]);
 
   const loadHistory = async () => {
     try {
@@ -38,8 +46,19 @@ export default function RoomHistoryScreen() {
       const params: any = { hotelId };
       if (selectedRoomId) params.roomId = selectedRoomId;
 
-      const response = await roomsService.getRoomHistory(hotelId, 'all', 1, 50);
+      const response = await roomsService.getRoomHistory(hotelId, 'all', currentPage, pageSize);
       setHistory(response.history || []);
+      
+      // Cập nhật pagination info
+      if (response.totalItems !== undefined) {
+        setTotalItems(response.totalItems);
+      }
+      if (response.totalPages !== undefined) {
+        setTotalPages(response.totalPages);
+      } else if (response.history && response.history.length > 0) {
+        // Tính totalPages nếu backend chưa trả về
+        setTotalPages(Math.ceil((response.totalItems || response.history.length) / pageSize));
+      }
     } catch (error: any) {
       console.error('Error loading history:', error);
       Alert.alert('Error', error.message || 'Failed to load history');
@@ -169,6 +188,29 @@ export default function RoomHistoryScreen() {
             <Text style={styles.emptyText}>No history found</Text>
           </View>
         }
+        ListFooterComponent={
+          totalPages > 1 ? (
+            <View style={styles.pagination}>
+              <TouchableOpacity
+                onPress={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
+              >
+                <Text style={styles.pageButtonText}>Previous</Text>
+              </TouchableOpacity>
+              <Text style={styles.pageInfo}>
+                Page {currentPage} / {totalPages}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
+              >
+                <Text style={styles.pageButtonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -264,6 +306,34 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    marginTop: 12,
+    borderRadius: 8,
+  },
+  pageButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#1890ff',
+    borderRadius: 4,
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#d9d9d9',
+    opacity: 0.5,
+  },
+  pageButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pageInfo: {
+    fontSize: 14,
+    color: '#666',
   },
 });
 

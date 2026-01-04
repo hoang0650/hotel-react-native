@@ -20,10 +20,12 @@ import { roomsService } from '@/services/rooms.service';
 import { hotelsService } from '@/services/hotels.service';
 import { bookingsService } from '@/services/bookings.service';
 import { revenueService } from '@/services/revenue.service';
+import { shiftHandoverService } from '@/services/shift-handover.service';
 import HotelSelector from '@/components/HotelSelector';
 import NotificationIcon from '@/components/NotificationIcon';
 import ChatBot from '@/components/ChatBot';
-import { format } from '@/utils/dateUtils';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { format, subDays, subWeeks, subMonths } from '@/utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +36,29 @@ interface RecentBooking {
   checkInDate: Date | string;
   checkOutDate: Date | string;
   status?: string;
+}
+
+interface RoomEvent {
+  _id: string;
+  type: 'checkin' | 'checkout' | 'maintenance' | 'transfer';
+  roomId?: {
+    _id: string;
+    roomNumber: string;
+  };
+  guestInfo?: {
+    name?: string;
+  };
+  checkinTime?: Date | string;
+  checkoutTime?: Date | string;
+  transferredFrom?: {
+    _id: string;
+    roomNumber: string;
+  };
+  transferredTo?: {
+    _id: string;
+    roomNumber: string;
+  };
+  createdAt: Date | string;
 }
 
 interface RecentActivity {
@@ -57,20 +82,26 @@ export default function HomeScreen() {
   const [vacant, setVacant] = useState(0);
   const [booked, setBooked] = useState(0);
   const [cleaning, setCleaning] = useState(0);
+  const [occupied, setOccupied] = useState(0);
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [roomEvents, setRoomEvents] = useState<RoomEvent[]>([]);
 
   // Revenue stats
   const [revenuePeriod, setRevenuePeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [revenueLoading, setRevenueLoading] = useState(false);
   const [revenueData, setRevenueData] = useState<number[]>([]);
   const [revenueLabels, setRevenueLabels] = useState<string[]>([]);
+  const [expenseData, setExpenseData] = useState<number[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
 
   // Room sales stats
   const [salesPeriod, setSalesPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [salesData, setSalesData] = useState<number[]>([]);
   const [salesLabels, setSalesLabels] = useState<string[]>([]);
   const [totalSales, setTotalSales] = useState(0);
+  const [salesLoading, setSalesLoading] = useState(false);
 
   // OTA Login Modal
   const [otaModalVisible, setOtaModalVisible] = useState(false);
@@ -86,7 +117,21 @@ export default function HomeScreen() {
     if (selectedHotelId) {
       loadDashboardData();
     }
-  }, [selectedHotelId, user, revenuePeriod, salesPeriod]);
+  }, [selectedHotelId, user]);
+
+  // Load revenue data riêng khi revenuePeriod thay đổi
+  useEffect(() => {
+    if (selectedHotelId) {
+      loadRevenueData();
+    }
+  }, [revenuePeriod, selectedHotelId]);
+
+  // Load sales data riêng khi salesPeriod thay đổi
+  useEffect(() => {
+    if (selectedHotelId) {
+      loadSalesData();
+    }
+  }, [salesPeriod, selectedHotelId]);
 
   const loadDashboardData = async () => {
     if (!selectedHotelId) return;
@@ -104,10 +149,12 @@ export default function HomeScreen() {
         const cleaningCount = rooms.filter(
           (r) => r.status === 'cleaning' || r.status === 'dirty'
         ).length;
+        const occupiedCount = rooms.filter((r) => r.status === 'occupied').length;
         
         setVacant(vacantCount);
         setBooked(bookedCount);
         setCleaning(cleaningCount);
+        setOccupied(occupiedCount);
       } catch (error) {
         console.error('Error loading rooms:', error);
       }
@@ -138,6 +185,17 @@ export default function HomeScreen() {
         setRecentBookings(transformedBookings);
       } catch (error) {
         console.error('Error loading bookings:', error);
+      }
+
+      // Load room events
+      try {
+        const events = await roomsService.getEventsByHotelId(selectedHotelId, {
+          limit: 5,
+          types: ['checkin', 'checkout', 'maintenance', 'transfer']
+        });
+        setRoomEvents(events);
+      } catch (error) {
+        console.error('Error loading room events:', error);
       }
 
       // Load recent activities (from room events)
@@ -182,78 +240,97 @@ export default function HomeScreen() {
         console.error('Error loading activities:', error);
       }
 
-      // Load revenue stats
-      try {
-        const today = new Date();
-        const startDate = format(today, 'yyyy-MM-dd');
-        const revenue = await revenueService.getRevenue({
-          hotelId: selectedHotelId,
-          period: revenuePeriod,
-          startDate,
-        });
-        
-        setRevenueData(revenue.revenueData || []);
-        setRevenueLabels(revenue.labels || []);
-        setTotalRevenue(revenue.totalRevenue || 0);
-      } catch (error) {
-        console.error('Error loading revenue:', error);
-        // Set default data for demo
-        if (revenuePeriod === 'day') {
-          setRevenueLabels(['Sáng', 'Trưa', 'Chiều', 'Tối']);
-          setRevenueData([15000, 22000, 18000, 25000]);
-          setTotalRevenue(8000000);
-        }
-      }
+      // Load revenue data lần đầu
+      await loadRevenueData();
 
-      // Load room sales stats
-      try {
-        // Calculate from bookings
-        const bookingsData = await bookingsService.getBookings({
-          hotelId: selectedHotelId,
-        });
-        
-        // Group by period of day
-        const salesByPeriod: Record<string, number> = {
-          'Sáng': 0,
-          'Trưa': 0,
-          'Chiều': 0,
-          'Tối': 0,
-        };
-        
-        bookingsData.bookings.forEach((booking: any) => {
-          const checkInTime = new Date(booking.checkInDate || booking.checkinDate);
-          const hour = checkInTime.getHours();
-          let period = 'Sáng';
-          if (hour >= 6 && hour < 12) period = 'Sáng';
-          else if (hour >= 12 && hour < 17) period = 'Trưa';
-          else if (hour >= 17 && hour < 22) period = 'Chiều';
-          else period = 'Tối';
-          
-          salesByPeriod[period]++;
-        });
-        
-        setSalesLabels(['Sáng', 'Trưa', 'Chiều', 'Tối']);
-        setSalesData([
-          salesByPeriod['Sáng'] || 5,
-          salesByPeriod['Trưa'] || 8,
-          salesByPeriod['Chiều'] || 6,
-          salesByPeriod['Tối'] || 10,
-        ]);
-        setTotalSales(
-          salesByPeriod['Sáng'] + salesByPeriod['Trưa'] + salesByPeriod['Chiều'] + salesByPeriod['Tối'] || 29
-        );
-      } catch (error) {
-        console.error('Error loading sales:', error);
-        // Set default data for demo
-        setSalesLabels(['Sáng', 'Trưa', 'Chiều', 'Tối']);
-        setSalesData([5, 8, 6, 10]);
-        setTotalSales(29);
-      }
+      // Load room sales stats sẽ được gọi riêng trong loadSalesData
+      await loadSalesData();
     } catch (error: any) {
       console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const loadRevenueData = async () => {
+    if (!selectedHotelId) return;
+
+    try {
+      setRevenueLoading(true);
+      const revenue = await revenueService.getRevenue({
+        hotelId: selectedHotelId,
+        period: revenuePeriod,
+      });
+      
+      console.log('Revenue loaded for hotel:', selectedHotelId, 'Period:', revenuePeriod, 'Data:', {
+        labels: revenue.labels?.length || 0,
+        revenueData: revenue.revenueData?.length || 0,
+        totalRevenue: revenue.totalRevenue,
+        totalExpense: revenue.totalExpense,
+      });
+      
+      setRevenueData(revenue.revenueData || []);
+      setRevenueLabels(revenue.labels || []);
+      setExpenseData(revenue.expenseData || []);
+      setTotalRevenue(revenue.totalRevenue || 0);
+      setTotalExpense(revenue.totalExpense || 0);
+    } catch (error) {
+      console.error('Error loading revenue:', error);
+      setRevenueData([]);
+      setRevenueLabels([]);
+      setExpenseData([]);
+      setTotalRevenue(0);
+      setTotalExpense(0);
+    } finally {
+      setRevenueLoading(false);
+    }
+  };
+
+  const loadSalesData = async () => {
+    if (!selectedHotelId) return;
+
+    try {
+      setSalesLoading(true);
+      const now = new Date();
+      let startDate: Date;
+      switch (salesPeriod) {
+        case 'day':
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 6);
+          break;
+        case 'week':
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 27);
+          break;
+        case 'month':
+          startDate = new Date(now);
+          startDate.setMonth(startDate.getMonth() - 11);
+          startDate.setDate(1);
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 6);
+      }
+
+      const checkinData = await shiftHandoverService.getCheckinCountByPeriod(
+        selectedHotelId,
+        salesPeriod,
+        format(startDate, 'yyyy-MM-dd'),
+        format(now, 'yyyy-MM-dd')
+      );
+
+      setSalesLabels(checkinData.labels || []);
+      setSalesData(checkinData.checkinCountData || []);
+      setTotalSales(checkinData.totalCheckins || 0);
+    } catch (error) {
+      console.error('Error loading checkin count:', error);
+      // Set empty data on error
+      setSalesLabels([]);
+      setSalesData([]);
+      setTotalSales(0);
+    } finally {
+      setSalesLoading(false);
     }
   };
 
@@ -371,19 +448,12 @@ export default function HomeScreen() {
   };
 
   const renderLineChart = (data: number[], labels: string[], maxValue: number) => {
-    const chartHeight = 150;
+    const chartHeight = 140; // 180 - 40 paddingBottom = 140
     const chartWidth = width - 64;
-    const barWidth = (chartWidth - 40) / labels.length;
+    const barWidth = (chartWidth - 20) / labels.length; // Không cần trừ padding cho Y-axis
 
     return (
       <View style={styles.chartContainer}>
-        <View style={styles.chartYAxis}>
-          {[0, maxValue / 4, maxValue / 2, (maxValue * 3) / 4, maxValue].map((value) => (
-            <Text key={value} style={styles.chartYLabel}>
-              {value.toLocaleString('vi-VN')}
-            </Text>
-          ))}
-        </View>
         <View style={styles.chartContent}>
           <View style={styles.chartBars}>
             {data.map((value, index) => {
@@ -399,6 +469,7 @@ export default function HomeScreen() {
                       },
                     ]}
                   />
+                  {/* Label ngày tháng (X-axis) */}
                   <Text style={styles.chartXLabel}>{labels[index]}</Text>
                 </View>
               );
@@ -440,41 +511,88 @@ export default function HomeScreen() {
   };
 
   const renderBarChart = (data: number[], labels: string[], maxValue: number) => {
-    const chartHeight = 150;
+    if (data.length === 0) {
+      return (
+        <View style={styles.chartEmptyContainer}>
+          <Text style={styles.chartEmptyText}>{t('common.no_data')}</Text>
+        </View>
+      );
+    }
+
+    // Chiều cao thực tế của biểu đồ (có paddingBottom cho X-axis labels)
+    // chartBars có height: 180 và paddingBottom: 40, nên chiều cao thực tế cho bars là 140
+    const chartHeight = 140; // 180 - 40 = 140 (chiều cao thực tế cho bars)
     const chartWidth = width - 64;
-    const barWidth = (chartWidth - 40) / labels.length;
+    const barSpacing = 24; // Khoảng cách giữa các cột (24px)
+    const availableWidth = chartWidth - 20; // Không cần trừ padding cho Y-axis nữa
+    const barWidth = Math.max(20, Math.min(40, (availableWidth - (barSpacing * (data.length - 1))) / data.length));
 
     return (
-      <View style={styles.chartContainer}>
-        <View style={styles.chartYAxis}>
-          {[0, maxValue / 5, (maxValue * 2) / 5, (maxValue * 3) / 5, (maxValue * 4) / 5, maxValue].map((value) => (
-            <Text key={value} style={styles.chartYLabel}>
-              {value}
-            </Text>
-          ))}
-        </View>
-        <View style={styles.chartContent}>
-          <View style={styles.chartBars}>
-            {data.map((value, index) => {
-              const height = (value / maxValue) * chartHeight;
-              return (
-                <View key={index} style={styles.chartBarContainer}>
-                  <View
-                    style={[
-                      styles.chartBar,
-                      {
-                        height: Math.max(height, 4),
-                        backgroundColor: '#52c41a',
-                      },
-                    ]}
-                  />
-                  <Text style={styles.chartXLabel}>{labels[index]}</Text>
-                </View>
-              );
-            })}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 10 }}
+      >
+        <View style={styles.chartContainer}>
+          <View style={styles.chartContent}>
+            <View style={styles.chartBars}>
+              {data.map((value, index) => {
+                // Tính chiều cao cột dựa trên giá trị và maxValue
+                // Đảm bảo tính toán chính xác và không vượt quá maxValue
+                const numericValue = Number(value) || 0;
+                const numericMaxValue = Number(maxValue) || 1;
+                // Đảm bảo giá trị không vượt quá maxValue
+                const clampedValue = Math.min(numericValue, numericMaxValue);
+                // Tính chiều cao: (giá trị / maxValue) * chiều cao biểu đồ (140px)
+                // chartHeight = 140 là chiều cao thực tế cho bars (không bao gồm paddingBottom)
+                const height = numericMaxValue > 0 ? Math.floor((clampedValue / numericMaxValue) * chartHeight) : 0;
+                const displayValue = numericValue; // Giữ nguyên giá trị để hiển thị
+                // Min height 4 nếu có giá trị, nhưng không được vượt quá chartHeight
+                // Đảm bảo barHeight không bao giờ vượt quá chartHeight
+                const barHeight = Math.min(Math.max(height, numericValue > 0 ? 4 : 0), chartHeight);
+                
+                return (
+                  <View key={index} style={[styles.chartBarContainer, { marginHorizontal: barSpacing / 2 }]}>
+                    <View style={styles.chartBarWrapper}>
+                      {/* Cột bar - căn từ bottom, chiều cao chính xác */}
+                      <View
+                        style={[
+                          styles.chartBar,
+                          {
+                            height: barHeight,
+                            width: barWidth,
+                            backgroundColor: '#1890ff',
+                          },
+                        ]}
+                      />
+                      {/* Hiển thị giá trị trên cột - đảm bảo luôn trong vùng nhìn thấy */}
+                      {displayValue > 0 && (
+                        <View style={[styles.chartBarValueContainer, { 
+                          bottom: barHeight >= chartHeight - 30 
+                            ? chartHeight - 30  // Nếu cột quá cao, đặt số lượng ở vị trí cố định để luôn nhìn thấy
+                            : barHeight + 4     // Nếu cột thấp, đặt trên đỉnh cột với khoảng cách 4px
+                        }]}>
+                          <Text style={styles.chartBarValue}>
+                            {displayValue >= 1000000 
+                              ? `${(displayValue / 1000000).toFixed(1)}M`
+                              : displayValue >= 1000
+                              ? `${(displayValue / 1000).toFixed(1)}K`
+                              : displayValue.toString()}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    {/* Label ngày tháng (X-axis) */}
+                    <Text style={styles.chartXLabel} numberOfLines={1}>
+                      {labels[index]}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -487,7 +605,23 @@ export default function HomeScreen() {
   }
 
   const revenueMaxValue = getMaxValue(revenueData);
-  const salesMaxValue = Math.max(...salesData, 20);
+  
+  // Tính maxValue cho sales data với làm tròn đẹp
+  const getSalesMaxValue = (data: number[]): number => {
+    if (data.length === 0) return 10;
+    const max = Math.max(...data);
+    if (max === 0) return 10;
+    // Làm tròn lên số đẹp (5, 10, 20, 50, 100, ...)
+    if (max <= 5) return 5;
+    if (max <= 10) return 10;
+    if (max <= 20) return 20;
+    if (max <= 50) return 50;
+    if (max <= 100) return 100;
+    // Làm tròn lên bội số của 10
+    return Math.ceil(max / 10) * 10;
+  };
+  
+  const salesMaxValue = getSalesMaxValue(salesData);
 
   return (
     <View style={styles.container}>
@@ -498,7 +632,7 @@ export default function HomeScreen() {
             selectedHotelId={selectedHotelId}
             onSelectHotel={handleSelectHotel}
           />
-          <NotificationIcon count={5} />
+          <NotificationIcon />
         </View>
         <Text style={styles.headerTitle}>{t('home.title')}</Text>
         <Text style={styles.headerSubtitle}>{t('home.welcome')}</Text>
@@ -515,6 +649,10 @@ export default function HomeScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{vacant}</Text>
             <Text style={styles.statLabel}>{t('home.room.vacant')}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{occupied}</Text>
+            <Text style={styles.statLabel}>{t('home.room.occupied')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{booked}</Text>
@@ -582,15 +720,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('home.quickAccess.title')}</Text>
           <View style={styles.quickAccessContainer}>
-            <TouchableOpacity
-              style={styles.quickAccessItem}
-              onPress={() => router.push('/(tabs)/rooms')}
-            >
-              <View style={[styles.quickAccessIcon, { backgroundColor: '#87ceeb' }]}>
-                <Text style={styles.quickAccessIconText}>🛏️</Text>
-              </View>
-              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.rooms')}</Text>
-            </TouchableOpacity>
+            {/* Row 1 */}
             <TouchableOpacity
               style={styles.quickAccessItem}
               onPress={() => router.push('/(tabs)/invoices')}
@@ -602,9 +732,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickAccessItem}
-              onPress={() => {
-                // TODO: Navigate to services screen
-              }}
+              onPress={() => router.push('/(tabs)/management/service')}
             >
               <View style={[styles.quickAccessIcon, { backgroundColor: '#ff9800' }]}>
                 <Text style={styles.quickAccessIconText}>📋</Text>
@@ -613,12 +741,59 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickAccessItem}
-              onPress={() => router.push('/(tabs)/profile')}
+              onPress={() => router.push('/(tabs)/management/staff')}
             >
-              <View style={[styles.quickAccessIcon, { backgroundColor: '#9c27b0' }]}>
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#1890ff' }]}>
+                <Text style={styles.quickAccessIconText}>👥</Text>
+              </View>
+              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.staff')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickAccessItem, styles.quickAccessItemLastInRow]}
+              onPress={() => router.push('/(tabs)/invoices?report=shift-history')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#13c2c2' }]}>
+                <Text style={styles.quickAccessIconText}>🔄</Text>
+              </View>
+              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.shiftHistory')}</Text>
+            </TouchableOpacity>
+            
+            {/* Row 2 */}
+            <TouchableOpacity
+              style={styles.quickAccessItem}
+              onPress={() => router.push('/(tabs)/management/room')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#87ceeb' }]}>
+                <Text style={styles.quickAccessIconText}>🛏️</Text>
+              </View>
+              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.rooms')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAccessItem}
+              onPress={() => router.push('/(tabs)/management/guest')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#722ed1' }]}>
                 <Text style={styles.quickAccessIconText}>👤</Text>
               </View>
-              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.account')}</Text>
+              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.guests')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAccessItem}
+              onPress={() => router.push('/(tabs)/management/debt')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#fa8c16' }]}>
+                <Text style={styles.quickAccessIconText}>💰</Text>
+              </View>
+              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.debt')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickAccessItem, styles.quickAccessItemLastInRow]}
+              onPress={() => router.push('/(tabs)/invoices?report=payment-history')}
+            >
+              <View style={[styles.quickAccessIcon, { backgroundColor: '#eb2f96' }]}>
+                <Text style={styles.quickAccessIconText}>💳</Text>
+              </View>
+              <Text style={styles.quickAccessLabel}>{t('home.quickAccess.paymentHistory')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -652,6 +827,87 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Room Events */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sự kiện</Text>
+          {roomEvents.length === 0 ? (
+            <Text style={styles.emptyText}>Không có sự kiện nào</Text>
+          ) : (
+            roomEvents.map((event) => {
+              const getEventLabel = () => {
+                switch (event.type) {
+                  case 'checkin':
+                    return 'Nhận phòng';
+                  case 'checkout':
+                    return 'Trả phòng';
+                  case 'maintenance':
+                    return 'Dọn phòng';
+                  case 'transfer':
+                    return 'Chuyển phòng';
+                  default:
+                    return 'Sự kiện';
+                }
+              };
+
+              const getEventColor = () => {
+                switch (event.type) {
+                  case 'checkin':
+                    return '#52c41a';
+                  case 'checkout':
+                    return '#1890ff';
+                  case 'maintenance':
+                    return '#faad14';
+                  case 'transfer':
+                    return '#722ed1';
+                  default:
+                    return '#999';
+                }
+              };
+
+              const getEventDetails = () => {
+                const roomNumber = event.roomId?.roomNumber || 'N/A';
+                const guestName = event.guestInfo?.name || 'Khách lẻ';
+                
+                switch (event.type) {
+                  case 'checkin':
+                    return `Phòng ${roomNumber} • ${guestName}`;
+                  case 'checkout':
+                    return `Phòng ${roomNumber} • ${guestName}`;
+                  case 'maintenance':
+                    return `Phòng ${roomNumber}`;
+                  case 'transfer':
+                    const fromRoom = event.transferredFrom?.roomNumber || 'N/A';
+                    const toRoom = event.transferredTo?.roomNumber || event.roomId?.roomNumber || 'N/A';
+                    return `Phòng ${fromRoom} → Phòng ${toRoom}`;
+                  default:
+                    return `Phòng ${roomNumber}`;
+                }
+              };
+
+              return (
+                <View key={event._id} style={styles.bookingCard}>
+                  <View style={styles.bookingInfo}>
+                    <Text style={styles.bookingGuestName}>{getEventLabel()}</Text>
+                    <Text style={styles.bookingDetails}>
+                      {getEventDetails()} • {formatDate(event.createdAt)}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.bookingStatus,
+                      { backgroundColor: getEventColor() },
+                    ]}
+                  >
+                    <Text style={styles.bookingStatusText}>
+                      {getEventLabel()}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         {/* Recent Activities */}
         {recentActivities.length > 0 && (
           <View style={styles.section}>
@@ -679,7 +935,20 @@ export default function HomeScreen() {
 
         {/* Revenue Statistics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('home.revenue.title')}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t('home.revenue.title')}</Text>
+            <TouchableOpacity
+              style={styles.reloadButtonSmall}
+              onPress={() => {
+                if (selectedHotelId) {
+                  loadRevenueData();
+                }
+              }}
+              disabled={revenueLoading}
+            >
+              <IconSymbol name="arrow.clockwise" size={16} color={revenueLoading ? '#999' : '#1890ff'} />
+            </TouchableOpacity>
+          </View>
           <View style={styles.periodButtons}>
             {(['day', 'week', 'month'] as const).map((period) => (
               <TouchableOpacity
@@ -689,6 +958,7 @@ export default function HomeScreen() {
                   revenuePeriod === period && styles.periodButtonActive,
                 ]}
                 onPress={() => setRevenuePeriod(period)}
+                disabled={revenueLoading}
               >
                 <Text
                   style={[
@@ -696,23 +966,67 @@ export default function HomeScreen() {
                     revenuePeriod === period && styles.periodButtonTextActive,
                   ]}
                 >
-                  {period === 'day' ? 'Theo ngày' : period === 'week' ? 'Theo tuần' : 'Theo tháng'}
+                  {period === 'day' ? t('home.revenue.period.day') : period === 'week' ? t('home.revenue.period.week') : t('home.revenue.period.month')}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          {revenueData.length > 0 && renderLineChart(revenueData, revenueLabels, revenueMaxValue)}
-          <View style={styles.totalContainer}>
-            <Text style={styles.totalLabel}>{t('home.revenue.total')}</Text>
-            <Text style={[styles.totalValue, { color: '#1890ff' }]}>
-              {totalRevenue.toLocaleString('vi-VN')} ₫
-            </Text>
-          </View>
+          {revenueLoading ? (
+            <View style={styles.chartLoadingContainer}>
+              <ActivityIndicator size="small" color="#1890ff" />
+              <Text style={styles.chartLoadingText}>Đang tải dữ liệu...</Text>
+            </View>
+          ) : revenueData.length > 0 ? (
+            <>
+              {renderBarChart(revenueData, revenueLabels, revenueMaxValue)}
+              <View style={styles.revenueSummary}>
+                <View style={styles.revenueSummaryItem}>
+                  <Text style={styles.revenueSummaryLabel}>Tổng doanh thu:</Text>
+                  <Text style={[styles.revenueSummaryValue, { color: '#1890ff' }]}>
+                    {totalRevenue.toLocaleString('vi-VN')} ₫
+                  </Text>
+                </View>
+                <View style={styles.revenueSummaryItem}>
+                  <Text style={styles.revenueSummaryLabel}>Tổng chi phí:</Text>
+                  <Text style={[styles.revenueSummaryValue, { color: '#ff4d4f' }]}>
+                    {totalExpense.toLocaleString('vi-VN')} ₫
+                  </Text>
+                </View>
+                <View style={styles.revenueSummaryItem}>
+                  <Text style={styles.revenueSummaryLabel}>Lợi nhuận:</Text>
+                  <Text style={[
+                    styles.revenueSummaryValue,
+                    { color: (totalRevenue - totalExpense) >= 0 ? '#52c41a' : '#ff4d4f' }
+                  ]}>
+                    {(totalRevenue - totalExpense).toLocaleString('vi-VN')} ₫
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.chartEmptyContainer}>
+              <IconSymbol name="chart.bar" size={48} color="#d9d9d9" />
+              <Text style={styles.chartEmptyText}>Không có dữ liệu doanh thu</Text>
+            </View>
+          )}
         </View>
 
         {/* Room Sales Statistics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('home.sales.title')}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t('home.sales.title')}</Text>
+            <TouchableOpacity
+              style={styles.reloadButtonSmall}
+              onPress={() => {
+                if (selectedHotelId) {
+                  loadSalesData();
+                }
+              }}
+              disabled={salesLoading}
+            >
+              <IconSymbol name="arrow.clockwise" size={16} color={salesLoading ? "#999" : "#1890ff"} />
+            </TouchableOpacity>
+          </View>
           <View style={styles.periodButtons}>
             {(['day', 'week', 'month'] as const).map((period) => (
               <TouchableOpacity
@@ -722,6 +1036,7 @@ export default function HomeScreen() {
                   salesPeriod === period && styles.periodButtonActive,
                 ]}
                 onPress={() => setSalesPeriod(period)}
+                disabled={salesLoading}
               >
                 <Text
                   style={[
@@ -734,11 +1049,23 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {salesData.length > 0 && renderBarChart(salesData, salesLabels, salesMaxValue)}
+          {salesLoading ? (
+            <View style={styles.chartLoadingContainer}>
+              <ActivityIndicator size="small" color="#1890ff" />
+              <Text style={styles.chartLoadingText}>{t('common.loading')}</Text>
+            </View>
+          ) : salesData.length > 0 ? (
+            renderBarChart(salesData, salesLabels, salesMaxValue)
+          ) : (
+            <View style={styles.chartEmptyContainer}>
+              <IconSymbol name="doc.text.fill" size={40} color="#999" style={{ marginBottom: 10 }} />
+              <Text style={styles.chartEmptyText}>{t('common.no_data')}</Text>
+            </View>
+          )}
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>{t('home.sales.total')}</Text>
-            <Text style={[styles.totalValue, { color: '#52c41a' }]}>
-              {totalSales} phòng
+            <Text style={[styles.totalValue, { color: '#52c41a' }]} numberOfLines={1}>
+              {totalSales.toLocaleString('vi-VN')} lượt
             </Text>
           </View>
         </View>
@@ -897,11 +1224,22 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 16,
+    flex: 1,
+  },
+  reloadButtonSmall: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
   },
   otaContainer: {
     flexDirection: 'row',
@@ -932,13 +1270,16 @@ const styles = StyleSheet.create({
   },
   quickAccessContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     flexWrap: 'wrap',
   },
   quickAccessItem: {
     alignItems: 'center',
-    width: (width - 64) / 4,
+    width: `${((100 - (3 * 2.5)) / 4)}%`, // 4 columns with 2.5% gap between each (3 gaps total)
+    marginRight: '2.5%',
     marginBottom: 12,
+  },
+  quickAccessItemLastInRow: {
+    marginRight: 0, // Remove margin for last item in each row (4th and 8th items)
   },
   quickAccessIcon: {
     width: 56,
@@ -1048,42 +1389,96 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     flexDirection: 'row',
-    height: 200,
-    marginBottom: 16,
-  },
-  chartYAxis: {
-    width: 40,
-    justifyContent: 'space-between',
-    paddingRight: 8,
-  },
-  chartYLabel: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'right',
+    height: 180, // Chiều cao của biểu đồ (không cần Y-axis nữa)
+    marginBottom: 8,
+    minWidth: width - 64,
   },
   chartContent: {
     flex: 1,
     position: 'relative',
+    height: 180, // Cùng chiều cao với chartBars
+    paddingBottom: 0, // Không cần paddingBottom ở đây
   },
   chartBars: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 150,
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
+    height: 180,
+    paddingBottom: 40, // PaddingBottom để có chỗ cho X-axis labels
+    paddingHorizontal: 4,
   },
   chartBarContainer: {
     alignItems: 'center',
-    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  chartBarWrapper: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: 180, // Chiều cao cố định để căn đúng với chartBars
+    position: 'relative',
+    marginBottom: 0, // Không cần marginBottom vì đã có paddingBottom trong chartBars
   },
   chartBar: {
-    width: '80%',
     borderRadius: 4,
-    marginBottom: 8,
+    minHeight: 4,
+    alignSelf: 'flex-end', // Căn từ bottom
+  },
+  chartBarValueContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    width: '100%',
+    bottom: 0, // Sẽ được override bởi inline style
+  },
+  chartBarValue: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#333',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    borderRadius: 3,
+    minWidth: 20,
+    textAlign: 'center',
+    overflow: 'hidden',
+  },
+  chartXLabelContainer: {
+    alignItems: 'center',
+    marginTop: 4,
+    minHeight: 32,
+  },
+  chartXValue: {
+    fontSize: 12,
+    color: '#1890ff',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
   },
   chartXLabel: {
     fontSize: 10,
     color: '#666',
+    textAlign: 'center',
+    maxWidth: 60,
+  },
+  chartEmptyContainer: {
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  chartEmptyText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+  },
+  chartLoadingContainer: {
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  chartLoadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
   },
   chartLine: {
     position: 'absolute',
@@ -1102,18 +1497,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 12,
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
   totalLabel: {
     fontSize: 14,
     color: '#666',
+    fontWeight: '500',
   },
   totalValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
+  },
+  revenueSummary: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: 8,
+  },
+  revenueSummaryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  revenueSummaryLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  revenueSummaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   emptyText: {
     fontSize: 14,

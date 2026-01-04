@@ -14,7 +14,6 @@ export default function ManagementLayout() {
           headerShown: false,
         }}
       />
-      <Stack.Screen name="calendar" />
       <Stack.Screen name="service" />
       <Stack.Screen name="staff" />
       <Stack.Screen name="room" />

@@ -73,14 +73,22 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
   const [refreshing, setRefreshing] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'paid' | 'pending' | 'unpaid'>('all');
   const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset về trang 1 khi filter thay đổi
+  }, [filterType, selectedHotelId]);
 
   useEffect(() => {
     loadPaymentHistory();
-  }, [selectedHotelId, filterType]);
+  }, [selectedHotelId]);
 
   useEffect(() => {
     filterPayments();
-  }, [allPayments, filterType, searchText]);
+  }, [allPayments, filterType, searchText, currentPage]);
 
   const loadPaymentHistory = async () => {
     try {
@@ -92,10 +100,13 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
         return;
       }
 
-      // Lấy lịch sử phòng với filterType = 'checkout'
-      const response = await roomsService.getRoomHistory(hotelId, 'checkout');
+      // Lấy lịch sử phòng với filterType = 'checkout' và phân trang
+      // Lưu ý: Cần load tất cả dữ liệu để filter đúng, sau đó paginate ở frontend
+      // Hoặc backend cần filter đúng trước khi paginate
+      // Tạm thời load tất cả để filter đúng
+      const response = await roomsService.getRoomHistory(hotelId, 'checkout', 1, 1000);
       const history = response.history || [];
-
+      
       // Filter các bản ghi checkout giống như Angular component
       const filtered = history.filter((item: any) => {
         // Loại trừ các event không liên quan đến thanh toán
@@ -146,7 +157,10 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
         return true;
       });
 
+      // Lưu tất cả filtered data để tính stats và filter payment status
       setAllPayments(filtered);
+      
+      // filterPayments() sẽ tính lại totalItems và totalPages sau khi filter payment status và search
     } catch (error: any) {
       console.error('Error loading payment history:', error);
       Alert.alert('Lỗi', error.message || 'Không thể tải lịch sử thanh toán');
@@ -157,11 +171,17 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
   };
 
   const filterPayments = () => {
-    let filtered = [...allPayments];
+    if (allPayments.length === 0) {
+      setPayments([]);
+      setTotalItems(0);
+      setTotalPages(0);
+      return;
+    }
 
-    // Filter theo payment status
+    // Bước 1: Filter theo payment status trên toàn bộ allPayments
+    let filteredByStatus = allPayments;
     if (filterType !== 'all') {
-      filtered = filtered.filter((item) => {
+      filteredByStatus = allPayments.filter((item) => {
         const paymentStatus = item.paymentStatus ||
           item.payment?.status ||
           item.payment?.paymentStatus ||
@@ -182,10 +202,11 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
       });
     }
 
-    // Filter theo search text
+    // Bước 2: Filter theo search text trên dữ liệu đã filter payment status
+    let filteredBySearch = filteredByStatus;
     if (searchText) {
       const searchLower = searchText.toLowerCase();
-      filtered = filtered.filter((item) => {
+      filteredBySearch = filteredByStatus.filter((item) => {
         const roomNumber = item.roomNumber?.toLowerCase() || '';
         const customerName = (item.customerName ||
           item.guestInfo?.name ||
@@ -194,7 +215,18 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
       });
     }
 
-    setPayments(filtered);
+    // Bước 3: Cập nhật totalItems và totalPages dựa trên dữ liệu đã filter
+    const finalFilteredItems = filteredBySearch.length;
+    const finalTotalPages = Math.ceil(finalFilteredItems / pageSize);
+    setTotalItems(finalFilteredItems);
+    setTotalPages(finalTotalPages);
+
+    // Bước 4: Paginate dữ liệu cuối cùng
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedData = filteredBySearch.slice(startIndex, endIndex);
+
+    setPayments(paginatedData);
   };
 
   const onRefresh = () => {
@@ -592,6 +624,29 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
             <Text style={styles.emptyText}>Chưa có lịch sử thanh toán</Text>
           </View>
         }
+        ListFooterComponent={
+          totalPages > 1 ? (
+            <View style={styles.pagination}>
+              <TouchableOpacity
+                onPress={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
+              >
+                <Text style={styles.pageButtonText}>Trước</Text>
+              </TouchableOpacity>
+              <Text style={styles.pageInfo}>
+                Trang {currentPage} / {totalPages}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
+              >
+                <Text style={styles.pageButtonText}>Sau</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -873,5 +928,33 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    marginTop: 12,
+    borderRadius: 8,
+  },
+  pageButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#1890ff',
+    borderRadius: 4,
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#d9d9d9',
+    opacity: 0.5,
+  },
+  pageButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pageInfo: {
+    fontSize: 14,
+    color: '#666',
   },
 });

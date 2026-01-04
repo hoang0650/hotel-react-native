@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useLocalSearchParams } from 'expo-router';
 import InvoicesReport from '@/components/reports/InvoicesReport';
 import RevenueReport from '@/components/reports/RevenueReport';
 import PaymentHistoryReport from '@/components/reports/PaymentHistoryReport';
@@ -23,7 +24,15 @@ type ReportMenuItem = {
 
 export default function InvoicesScreen() {
   const { t } = useTranslation();
+  const params = useLocalSearchParams();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+
+  // Check if report param is provided from navigation
+  useEffect(() => {
+    if (params.report && typeof params.report === 'string') {
+      setSelectedReport(params.report);
+    }
+  }, [params.report]);
 
   const reportMenuItems: ReportMenuItem[] = useMemo(() => [
     {

@@ -39,6 +39,7 @@ export interface User {
   draftInvoiceFeature?: boolean;
   exportInvoiceFeature?: boolean;
   aiChatboxFeature?: boolean;
+  hotelNotificationFeature?: boolean;
   metadata?: any;
   bankAccount?: {
     bankName?: string;
@@ -322,80 +323,6 @@ export interface Invoice {
   [key: string]: any;
 }
 
-// Guest Types
-export interface GuestPersonalInfo {
-  firstName?: string;
-  lastName?: string;
-  fullName?: string;
-  dateOfBirth?: Date | string;
-  gender?: 'male' | 'female' | 'other';
-  nationality?: string;
-  idType?: 'passport' | 'id_card' | 'driver_license';
-  idNumber?: string;
-  idExpiryDate?: Date | string;
-  idScanUrl?: string;
-}
-
-export interface GuestContactInfo {
-  email?: string;
-  phone?: string;
-  alternativePhone?: string;
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    postalCode?: string;
-  };
-}
-
-export interface GuestPreferences {
-  roomType?: string;
-  floor?: string;
-  specialRequests?: string[];
-  dietaryRestrictions?: string[];
-}
-
-export interface GuestStayHistory {
-  bookingId?: string;
-  checkInDate?: Date | string;
-  checkOutDate?: Date | string;
-  roomNumber?: string;
-  totalSpent?: number;
-  rating?: number;
-  feedback?: string;
-}
-
-export interface Guest {
-  _id?: string;
-  userId?: string;
-  hotelId: string | { _id: string; name?: string; [key: string]: any };
-  businessId?: string | { _id: string; name?: string; [key: string]: any };
-  guestType?: 'regular' | 'frequent' | 'group';
-  isGroupLeader?: boolean;
-  groupId?: string;
-  groupMembers?: string[];
-  groupSize?: number;
-  personalInfo?: GuestPersonalInfo;
-  contactInfo?: GuestContactInfo;
-  preferences?: GuestPreferences;
-  stayHistory?: GuestStayHistory[];
-  loyaltyPoints?: number;
-  loyaltyTier?: 'standard' | 'silver' | 'gold' | 'platinum';
-  notes?: string;
-  createdAt?: Date | string;
-  updatedAt?: Date | string;
-  metadata?: any;
-}
-
-export interface GuestQuery {
-  hotelId?: string;
-  page?: number;
-  limit?: number;
-  search?: string;
-  guestType?: 'regular' | 'frequent' | 'group';
-}
-
 // Staff Types
 export interface StaffPersonalInfo {
   firstName: string;
@@ -554,5 +481,213 @@ export function getShiftLabel(shift: string): string {
     'full-day': 'Cả ngày'
   };
   return labels[shift] || shift;
+}
+
+// Guest Types
+export interface GuestPersonalInfo {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  dateOfBirth?: Date | string;
+  gender?: 'male' | 'female' | 'other';
+  nationality?: string;
+  idType?: 'passport' | 'id_card' | 'driver_license';
+  idNumber?: string;
+  idExpiryDate?: Date | string;
+  idScanUrl?: string;
+}
+
+export interface GuestContactInfo {
+  email?: string;
+  phone?: string;
+  alternativePhone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+  };
+}
+
+export interface GuestPreferences {
+  roomType?: string;
+  floor?: string;
+  specialRequests?: string[];
+  dietaryRestrictions?: string[];
+}
+
+export interface GuestStayHistory {
+  bookingId?: string;
+  checkInDate?: Date | string;
+  checkOutDate?: Date | string;
+  roomNumber?: string;
+  totalSpent?: number;
+  rating?: number;
+  feedback?: string;
+}
+
+export type GuestType = 'regular' | 'frequent' | 'group';
+export type LoyaltyTier = 'standard' | 'silver' | 'gold' | 'platinum';
+
+export interface Guest {
+  _id?: string;
+  userId?: string;
+  hotelId: string | { _id: string; name?: string; [key: string]: any };
+  businessId?: string | { _id: string; name?: string; [key: string]: any };
+  guestType?: GuestType;
+  isGroupLeader?: boolean;
+  groupId?: string;
+  groupMembers?: string[];
+  groupSize?: number;
+  personalInfo?: GuestPersonalInfo;
+  contactInfo?: GuestContactInfo;
+  preferences?: GuestPreferences;
+  stayHistory?: GuestStayHistory[];
+  loyaltyPoints?: number;
+  loyaltyTier?: LoyaltyTier;
+  notes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  metadata?: any;
+}
+
+export interface GuestQuery {
+  hotelId?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+  guestType?: GuestType;
+}
+
+// Debt Types
+export type DebtStatus = 'pending' | 'partial' | 'settled' | 'cancelled';
+
+export interface DebtLabel {
+  name: string;
+  color?: string;
+}
+
+export interface DebtPaymentHistory {
+  paymentDate: Date | string;
+  amount: number;
+  paymentMethod: string;
+  staffId?: string;
+  staffName?: string;
+  notes?: string;
+}
+
+export interface Debt {
+  _id?: string;
+  hotelId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  roomId?: string;
+  roomNumber: string;
+  bookingId?: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerId?: string;
+  guestInfo?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    idNumber?: string;
+    address?: string;
+    guestSource?: string;
+  };
+  createdByStaffId?: string;
+  createdByStaffName?: string;
+  settledByStaffId?: string;
+  settledByStaffName?: string;
+  debtAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: DebtStatus;
+  paymentMethod?: string;
+  debtDate: Date | string;
+  dueDate?: Date | string;
+  settledDate?: Date | string;
+  notes?: string;
+  labels?: Array<string | DebtLabel>;
+  paymentHistory?: DebtPaymentHistory[];
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+export interface DebtQuery {
+  page?: number;
+  pageSize?: number;
+  hotelId?: string;
+  status?: string;
+  customerId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface DebtResponse {
+  debts: Debt[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface SettleDebtRequest {
+  amount: number;
+  paymentMethod: string;
+  notes?: string;
+}
+
+// Notification Types
+export interface Announcement {
+  id: string;
+  type: 'maintenance' | 'update' | 'info' | 'warning' | 'success';
+  title: string;
+  message: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  startDate: Date | string;
+  endDate?: Date | string;
+  isActive: boolean;
+  targetRoles?: string[];
+  targetBusinesses?: string[];
+  targetHotels?: string[];
+  targetType?: 'system' | 'business' | 'hotel';
+  notificationType?: 'booking' | 'checkin' | 'checkout' | 'payment' | 'cancellation' | 'lowInventory' | 'systemError' | 'general' | 'registration' | 'contact' | 'maintenance' | 'transfer';
+  userId?: string;
+  isRead?: boolean;
+  createdAt: Date | string;
+  createdBy?: string;
+}
+
+export interface UnreadCountResponse {
+  success: boolean;
+  data: {
+    total: number;
+    system: number;
+    hotel: number;
+  };
+}
+
+export interface NotificationResponse {
+  success: boolean;
+  message?: string;
+  data: Announcement[];
+}
+
+export interface NotificationSettings {
+  enableEmailNotifications: boolean;
+  enableSMSNotifications: boolean;
+  enablePushNotifications: boolean;
+  notifyOnBooking: boolean;
+  notifyOnCheckin: boolean;
+  notifyOnCheckout: boolean;
+  notifyOnPayment: boolean;
+  notifyOnCancellation: boolean;
+  notifyOnLowInventory: boolean;
+  notifyOnSystemError: boolean;
+  notifyOnMaintenance?: boolean;
+  notifyOnTransfer?: boolean;
+  notificationEmail: string;
 }
 
