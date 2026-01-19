@@ -147,15 +147,6 @@ class RevenueService {
       if (query.endDate) params.append('endDate', query.endDate);
 
       const response = await apiService.get<RevenueData>(`/shift-handover/revenue/period?${params.toString()}`);
-      
-      console.log('Revenue loaded from backend:', {
-        labels: response.labels?.length || 0,
-        revenueData: response.revenueData?.length || 0,
-        expenseData: response.expenseData?.length || 0,
-        totalRevenue: response.totalRevenue,
-        totalExpense: response.totalExpense,
-        totalPayment: response.totalPayment,
-      });
 
       return {
         labels: response.labels || [],
