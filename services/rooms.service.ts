@@ -30,7 +30,7 @@ export interface CheckInData {
     checkinTime: Date | string;
     guestInfo: any;
     paymentMethod?: string;
-    rateType?: 'hourly' | 'daily' | 'nightly';
+    rateType?: import('@/types').RateType;
     advancePayment?: number;
     additionalCharges?: number;
     discount?: number;
@@ -263,7 +263,7 @@ export class RoomsService {
         guestSource?: string;
       };
       advancePayment?: number;
-      rateType?: 'hourly' | 'daily' | 'nightly';
+      rateType?: import('@/types').RateType;
       additionalCharges?: number;
       discount?: number;
       selectedServices?: Array<{
@@ -283,7 +283,7 @@ export class RoomsService {
     roomId: string;
     checkInTime: Date | string;
     checkOutTime: Date | string;
-    rateType?: 'hourly' | 'daily' | 'nightly';
+    rateType?: import('@/types').RateType;
     selectedServices?: Array<{
       serviceId?: string;
       serviceName?: string;

@@ -25,10 +25,12 @@ import FloorDropdown from '@/components/rooms/FloorDropdown';
 import CustomPicker from '@/components/ui/CustomPicker';
 import ChatBot from '@/components/ChatBot';
 import OCRScanner from '@/components/OCRScanner';
+import { transactionsService } from '@/services/transactions.service';
+import { serviceService } from '@/services/service.service';
 
 const { width } = Dimensions.get('window');
 
-type FilterType = 'all' | 'vacant' | 'occupied' | 'cleaning' | 'maintenance' | 'guest_out';
+type FilterType = 'all' | 'vacant' | 'occupied' | 'cleaning' | 'maintenance';
 
 export default function RoomsScreen() {
   const { user } = useAuth();
@@ -88,6 +90,26 @@ export default function RoomsScreen() {
   const [ocrScannerVisible, setOcrScannerVisible] = useState(false);
   const [checkoutOcrScannerVisible, setCheckoutOcrScannerVisible] = useState(false);
   
+  // Income/Expense modals
+  const [isIncomeModalVisible, setIncomeModalVisible] = useState(false);
+  const [isExpenseModalVisible, setExpenseModalVisible] = useState(false);
+  const [incomeForm, setIncomeForm] = useState({
+    amount: '',
+    method: 'cash',
+    incomeCategory: '',
+    description: '',
+    notes: '',
+    payer: '',
+  });
+  const [expenseForm, setExpenseForm] = useState({
+    amount: '',
+    method: 'cash',
+    expenseCategory: '',
+    description: '',
+    notes: '',
+    recipient: '',
+  });
+  
   // Transfer room modal state
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [transferSourceRoom, setTransferSourceRoom] = useState<Room | null>(null);
@@ -125,7 +147,6 @@ export default function RoomsScreen() {
         if (selectedFilter === 'cleaning')
           return room.status === 'cleaning' || room.status === 'dirty';
         if (selectedFilter === 'maintenance') return room.status === 'maintenance';
-        if (selectedFilter === 'guest_out') return room.status === 'guest_out';
         return true;
       });
     }
@@ -159,6 +180,94 @@ export default function RoomsScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const openIncomeModal = () => {
+    if (!selectedHotelId) {
+      Alert.alert('Thông báo', 'Vui lòng chọn khách sạn từ màn hình Home');
+      return;
+    }
+    setIncomeForm({
+      amount: '',
+      method: 'cash',
+      incomeCategory: '',
+      description: '',
+      notes: '',
+      payer: '',
+    });
+    setIncomeModalVisible(true);
+  };
+
+  const openExpenseModal = () => {
+    if (!selectedHotelId) {
+      Alert.alert('Thông báo', 'Vui lòng chọn khách sạn từ màn hình Home');
+      return;
+    }
+    setExpenseForm({
+      amount: '',
+      method: 'cash',
+      expenseCategory: '',
+      description: '',
+      notes: '',
+      recipient: '',
+    });
+    setExpenseModalVisible(true);
+  };
+
+  const submitIncome = async () => {
+    if (!selectedHotelId) {
+      Alert.alert('Thông báo', 'Vui lòng chọn khách sạn trước');
+      return;
+    }
+    const amountNumber = Number(incomeForm.amount);
+    if (!amountNumber || amountNumber <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+    try {
+      await transactionsService.createIncome({
+        hotelId: selectedHotelId,
+        amount: amountNumber,
+        method: incomeForm.method as any,
+        description: incomeForm.description || '',
+        notes: incomeForm.notes || '',
+        payer: incomeForm.payer || '',
+        incomeCategory: incomeForm.incomeCategory ? (incomeForm.incomeCategory as any) : undefined,
+      });
+      setIncomeModalVisible(false);
+      Alert.alert('Thành công', 'Tạo phiếu thu thành công');
+    } catch (error: any) {
+      console.error('Lỗi tạo phiếu thu:', error);
+      Alert.alert('Lỗi', error.response?.data?.message || 'Không thể tạo phiếu thu');
+    }
+  };
+
+  const submitExpense = async () => {
+    if (!selectedHotelId) {
+      Alert.alert('Thông báo', 'Vui lòng chọn khách sạn trước');
+      return;
+    }
+    const amountNumber = Number(expenseForm.amount);
+    if (!amountNumber || amountNumber <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+    try {
+      await transactionsService.createExpense({
+        hotelId: selectedHotelId,
+        amount: amountNumber,
+        method: expenseForm.method as any,
+        description: expenseForm.description || '',
+        notes: expenseForm.notes || '',
+        recipient: expenseForm.recipient || '',
+        expenseCategory: expenseForm.expenseCategory ? (expenseForm.expenseCategory as any) : undefined,
+      });
+      setExpenseModalVisible(false);
+      Alert.alert('Thành công', 'Tạo phiếu chi thành công');
+    } catch (error: any) {
+      console.error('Lỗi tạo phiếu chi:', error);
+      Alert.alert('Lỗi', error.response?.data?.message || 'Không thể tạo phiếu chi');
     }
   };
 
@@ -358,8 +467,8 @@ export default function RoomsScreen() {
       return;
     }
     try {
-      // TODO: Load services from API
-      setServices([]);
+      const list = await serviceService.getServices(checkoutRoom.hotelId);
+      setServices(Array.isArray(list) ? list : []);
     } catch (error: any) {
       console.error('Error loading services:', error);
       setServices([]);
@@ -437,34 +546,36 @@ export default function RoomsScreen() {
       let roomPrice = 0;
       let finalRateType = checkoutRateType;
 
-      // Gọi API để tính giá phòng chính xác theo priceConfig
+      // Gọi API để tính giá phòng chính xác theo priceConfig (chỉ khi rateType hỗ trợ)
+      const apiSupported = checkoutRateType === 'hourly' || checkoutRateType === 'daily' || checkoutRateType === 'nightly';
       try {
-        const priceResponse = await roomsService.calculateRoomPrice(
-          checkoutRoom._id!,
-          checkInTime,
-          checkOutTime,
-          checkoutRateType
-        );
-        
-        roomPrice = priceResponse.totalPrice || 0;
-        finalRateType = priceResponse.rateType || checkoutRateType;
+        if (apiSupported) {
+          const priceResponse = await roomsService.calculateRoomPrice(
+            checkoutRoom._id!,
+            checkInTime,
+            checkOutTime,
+            checkoutRateType
+          );
+          
+          roomPrice = priceResponse.totalPrice || 0;
+          finalRateType = priceResponse.rateType || checkoutRateType;
 
-        console.log('Price calculated from API:', {
-          roomPrice,
-          finalRateType,
-          originalRateType: priceResponse.originalRateType,
-          priceDetails: priceResponse.priceDetails,
-        });
-        
-        // Lưu chi tiết từ API nếu có
-        if (priceResponse.priceDetails) {
-          setRoomPriceDetails(priceResponse.priceDetails);
-        }
-        
-        // KHÔNG tự động chuyển rateType khi user chọn hourly - để user xem cách tính
-        // Chỉ cập nhật nếu không phải hourly hoặc nếu API trả về rateType khác
-        if (checkoutRateType !== 'hourly' && priceResponse.originalRateType && priceResponse.rateType !== priceResponse.originalRateType) {
-          setCheckoutRateType(priceResponse.rateType as RateType);
+          console.log('Price calculated from API:', {
+            roomPrice,
+            finalRateType,
+            originalRateType: priceResponse.originalRateType,
+            priceDetails: priceResponse.priceDetails,
+          });
+          
+          if (priceResponse.priceDetails) {
+            setRoomPriceDetails(priceResponse.priceDetails);
+          }
+          
+          if (checkoutRateType !== 'hourly' && priceResponse.originalRateType && priceResponse.rateType !== priceResponse.originalRateType) {
+            setCheckoutRateType(priceResponse.rateType as RateType);
+          }
+        } else {
+          throw new Error('Unsupported rateType for API');
         }
       } catch (apiError: any) {
         console.warn('API calculate price failed, using fallback calculation:', apiError);
@@ -681,6 +792,40 @@ export default function RoomsScreen() {
                 lateCheckoutSurcharge: lateCheckoutSurcharge2,
               });
             }
+            break;
+          
+          case 'weekly':
+            const weeklyRate = pricing.weekly || priceConfig?.weeklyRates?.standardPrice || 0;
+            const checkInDateForWeekly = new Date(checkInTime);
+            checkInDateForWeekly.setHours(0, 0, 0, 0);
+            const checkOutDateForWeekly = new Date(checkOutTime);
+            checkOutDateForWeekly.setHours(0, 0, 0, 0);
+            const totalDaysForWeekly = Math.max(1, Math.ceil((checkOutDateForWeekly.getTime() - checkInDateForWeekly.getTime()) / (1000 * 60 * 60 * 24)));
+            const weeks = Math.max(1, Math.ceil(totalDaysForWeekly / 7));
+            roomPrice = weeks * weeklyRate;
+            setRoomPriceDetails({
+              rateType: 'weekly',
+              basePrice: weeklyRate,
+              weeks,
+              days: totalDaysForWeekly,
+            });
+            break;
+          
+          case 'monthly':
+            const monthlyRate = pricing.monthly || priceConfig?.monthlyRates?.standardPrice || 0;
+            const checkInDateForMonthly = new Date(checkInTime);
+            checkInDateForMonthly.setHours(0, 0, 0, 0);
+            const checkOutDateForMonthly = new Date(checkOutTime);
+            checkOutDateForMonthly.setHours(0, 0, 0, 0);
+            const totalDaysForMonthly = Math.max(1, Math.ceil((checkOutDateForMonthly.getTime() - checkInDateForMonthly.getTime()) / (1000 * 60 * 60 * 24)));
+            const months = Math.max(1, Math.ceil(totalDaysForMonthly / 30));
+            roomPrice = months * monthlyRate;
+            setRoomPriceDetails({
+              rateType: 'monthly',
+              basePrice: monthlyRate,
+              months,
+              days: totalDaysForMonthly,
+            });
             break;
         }
         
@@ -979,9 +1124,8 @@ export default function RoomsScreen() {
     ).length;
     const booked = filteredRooms.filter((r) => r.status === 'booked').length;
     const maintenance = filteredRooms.filter((r) => r.status === 'maintenance').length;
-    const guestOut = filteredRooms.filter((r) => r.status === 'guest_out').length;
 
-    return { total, vacant, occupied, cleaning, booked, maintenance, guestOut };
+    return { total, vacant, occupied, cleaning, booked, maintenance };
   }, [filteredRooms]);
 
   if (loading && !refreshing) {
@@ -1041,14 +1185,11 @@ export default function RoomsScreen() {
             <Text style={styles.statValue}>{stats.maintenance}</Text>
             <Text style={styles.statLabel}>Bảo trì</Text>
           </View>
-          <View style={[styles.statItem, styles.statGuestOut]}>
-            <Text style={styles.statValue}>{stats.guestOut}</Text>
-            <Text style={styles.statLabel}>Khách ra ngoài</Text>
-          </View>
+          
 
           {/* Status Filters */}
           <View style={styles.filterSeparator} />
-          {['all', 'vacant', 'occupied', 'cleaning', 'maintenance', 'guest_out'].map((filter) => (
+          {['all', 'vacant', 'occupied', 'cleaning', 'maintenance'].map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[
@@ -1063,9 +1204,7 @@ export default function RoomsScreen() {
                   selectedFilter === filter && styles.filterTextActive,
                 ]}
               >
-                {filter === 'all'
-                  ? 'Tất cả'
-                  : filter === 'vacant'
+                { filter === 'vacant'
                   ? 'Trống'
                   : filter === 'occupied'
                   ? 'Đã thuê'
@@ -1073,7 +1212,7 @@ export default function RoomsScreen() {
                   ? 'Đang dọn'
                   : filter === 'maintenance'
                   ? 'Bảo trì'
-                  : 'Khách ra ngoài'}
+                  : 'Tất cả'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1096,6 +1235,15 @@ export default function RoomsScreen() {
             isGridView={isGridView}
             onToggle={setIsGridView}
           />
+          {/* Income/Expense Inline Actions */}
+          <View style={styles.headerActionsRight}>
+            <TouchableOpacity style={[styles.tinyButton, styles.tinyButtonPrimary]} onPress={openIncomeModal}>
+              <Text style={styles.tinyButtonText}>Phiếu Thu</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tinyButton]} onPress={openExpenseModal}>
+              <Text style={[styles.tinyButtonText, { color: '#fa8c16' }]}>Phiếu Chi</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
 
@@ -1122,6 +1270,164 @@ export default function RoomsScreen() {
           </View>
         }
       />
+
+      {/* Income Modal */}
+      <Modal visible={isIncomeModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIncomeModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentLarge}>
+            <ScrollView>
+              <Text style={styles.modalTitle}>Tạo phiếu thu</Text>
+              <View>
+                <Text style={styles.inputLabel}>Số tiền</Text>
+                <TextInput
+                  style={styles.input}
+                  value={incomeForm.amount}
+                  onChangeText={(text) => setIncomeForm({ ...incomeForm, amount: text })}
+                  placeholder="0"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.pickerContainer}>
+                <Text style={styles.inputLabel}>Phương thức</Text>
+                <CustomPicker
+                  selectedValue={incomeForm.method}
+                  onValueChange={(value) => setIncomeForm({ ...incomeForm, method: String(value) })}
+                  items={[
+                    { label: 'Tiền mặt', value: 'cash' },
+                    { label: 'Chuyển khoản', value: 'bank_transfer' },
+                    { label: 'Thẻ', value: 'card' },
+                  ]}
+                  placeholder="Chọn phương thức"
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Mô tả</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={incomeForm.description}
+                  onChangeText={(text) => setIncomeForm({ ...incomeForm, description: text })}
+                  placeholder="Nhập mô tả"
+                  multiline
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Ghi chú</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={incomeForm.notes}
+                  onChangeText={(text) => setIncomeForm({ ...incomeForm, notes: text })}
+                  placeholder="Nhập ghi chú"
+                  multiline
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Người nộp</Text>
+                <TextInput
+                  style={styles.input}
+                  value={incomeForm.payer}
+                  onChangeText={(text) => setIncomeForm({ ...incomeForm, payer: text })}
+                  placeholder="Tên người nộp"
+                />
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={submitIncome}>
+                  <Text style={styles.confirmButtonText}>Tạo phiếu thu</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setIncomeModalVisible(false)}>
+                  <Text style={styles.cancelButtonText}>Hủy</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Expense Modal */}
+      <Modal visible={isExpenseModalVisible} transparent={true} animationType="slide" onRequestClose={() => setExpenseModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentLarge}>
+            <ScrollView>
+              <Text style={styles.modalTitle}>Tạo phiếu chi</Text>
+              <View>
+                <Text style={styles.inputLabel}>Số tiền</Text>
+                <TextInput
+                  style={styles.input}
+                  value={expenseForm.amount}
+                  onChangeText={(text) => setExpenseForm({ ...expenseForm, amount: text })}
+                  placeholder="0"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.pickerContainer}>
+                <Text style={styles.inputLabel}>Phương thức</Text>
+                <CustomPicker
+                  selectedValue={expenseForm.method}
+                  onValueChange={(value) => setExpenseForm({ ...expenseForm, method: String(value) })}
+                  items={[
+                    { label: 'Tiền mặt', value: 'cash' },
+                    { label: 'Chuyển khoản', value: 'bank_transfer' },
+                    { label: 'Thẻ', value: 'card' },
+                  ]}
+                  placeholder="Chọn phương thức"
+                />
+              </View>
+              <View style={styles.pickerContainer}>
+                <Text style={styles.inputLabel}>Nhóm chi</Text>
+                <CustomPicker
+                  selectedValue={expenseForm.expenseCategory}
+                  onValueChange={(value) => setExpenseForm({ ...expenseForm, expenseCategory: String(value) })}
+                  items={[
+                    { label: 'Vật tư', value: 'supplies' },
+                    { label: 'Điện nước', value: 'utilities' },
+                    { label: 'Lương', value: 'salary' },
+                    { label: 'Bảo trì', value: 'maintenance' },
+                    { label: 'Marketing', value: 'marketing' },
+                    { label: 'Khác', value: 'other' },
+                  ]}
+                  placeholder="Chọn nhóm chi"
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Mô tả</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={expenseForm.description}
+                  onChangeText={(text) => setExpenseForm({ ...expenseForm, description: text })}
+                  placeholder="Nhập mô tả"
+                  multiline
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Ghi chú</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={expenseForm.notes}
+                  onChangeText={(text) => setExpenseForm({ ...expenseForm, notes: text })}
+                  placeholder="Nhập ghi chú"
+                  multiline
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Người nhận</Text>
+                <TextInput
+                  style={styles.input}
+                  value={expenseForm.recipient}
+                  onChangeText={(text) => setExpenseForm({ ...expenseForm, recipient: text })}
+                  placeholder="Tên người nhận"
+                />
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={submitExpense}>
+                  <Text style={styles.confirmButtonText}>Tạo phiếu chi</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setExpenseModalVisible(false)}>
+                  <Text style={styles.cancelButtonText}>Hủy</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
 
       {/* Chat Bot Modal */}
@@ -1243,7 +1549,7 @@ export default function RoomsScreen() {
             <View style={styles.rateTypeContainer}>
               <Text style={styles.inputLabel}>Loại giá:</Text>
               <View style={styles.rateTypeButtons}>
-                {(['hourly', 'daily', 'nightly'] as const).map((type) => (
+                {(['hourly', 'daily', 'nightly', 'weekly', 'monthly'] as const).map((type) => (
                   <TouchableOpacity
                     key={type}
                     style={[
@@ -1258,7 +1564,7 @@ export default function RoomsScreen() {
                         rateType === type && styles.rateTypeButtonTextActive,
                       ]}
                     >
-                      {type === 'hourly' ? 'Theo giờ' : type === 'daily' ? 'Theo ngày' : 'Qua đêm'}
+                      {type === 'hourly' ? 'Theo giờ' : type === 'daily' ? 'Theo ngày' : type === 'nightly' ? 'Qua đêm' : type === 'weekly' ? 'Theo tuần' : 'Theo tháng'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -1428,7 +1734,7 @@ export default function RoomsScreen() {
             <Text style={styles.sectionTitle}>Cách tính tiền phòng</Text>
             <View style={styles.rateTypeContainer}>
               <View style={styles.rateTypeButtons}>
-                {(['hourly', 'daily', 'nightly'] as const).map((type) => (
+                {(['hourly', 'daily', 'nightly', 'weekly', 'monthly'] as const).map((type) => (
                   <TouchableOpacity
                     key={type}
                     style={[
@@ -1447,7 +1753,7 @@ export default function RoomsScreen() {
                         checkoutRateType === type && styles.rateTypeButtonTextActive,
                       ]}
                     >
-                      {type === 'hourly' ? 'Theo giờ' : type === 'daily' ? 'Theo ngày' : 'Qua đêm'}
+                      {type === 'hourly' ? 'Theo giờ' : type === 'daily' ? 'Theo ngày' : type === 'nightly' ? 'Qua đêm' : type === 'weekly' ? 'Theo tuần' : 'Theo tháng'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -1660,6 +1966,48 @@ export default function RoomsScreen() {
                       )}
                     </>
                   )}
+
+                  {/* Chi tiết theo tuần */}
+                  {roomPriceDetails.rateType === 'weekly' && (
+                    <>
+                      <View style={styles.priceDetailRow}>
+                        <Text style={styles.priceDetailLabel}>
+                          {roomPriceDetails.weeks} tuần × {formatCurrency(roomPriceDetails.basePrice || 0)} đ/tuần:
+                        </Text>
+                        <Text style={styles.priceDetailValue}>
+                          {formatCurrency((roomPriceDetails.weeks || 0) * (roomPriceDetails.basePrice || 0))} đ
+                        </Text>
+                      </View>
+                      {roomPriceDetails.days > 0 && (
+                        <View style={styles.priceDetailInfo}>
+                          <Text style={styles.priceDetailInfoText}>
+                            Tổng số ngày: {roomPriceDetails.days}
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {/* Chi tiết theo tháng */}
+                  {roomPriceDetails.rateType === 'monthly' && (
+                    <>
+                      <View style={styles.priceDetailRow}>
+                        <Text style={styles.priceDetailLabel}>
+                          {roomPriceDetails.months} tháng × {formatCurrency(roomPriceDetails.basePrice || 0)} đ/tháng:
+                        </Text>
+                        <Text style={styles.priceDetailValue}>
+                          {formatCurrency((roomPriceDetails.months || 0) * (roomPriceDetails.basePrice || 0))} đ
+                        </Text>
+                      </View>
+                      {roomPriceDetails.days > 0 && (
+                        <View style={styles.priceDetailInfo}>
+                          <Text style={styles.priceDetailInfoText}>
+                            Tổng số ngày: {roomPriceDetails.days}
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
                 </View>
               )}
               
@@ -1830,6 +2178,29 @@ export default function RoomsScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
+          <OCRScanner
+            visible={checkoutOcrScannerVisible}
+            onClose={() => setCheckoutOcrScannerVisible(false)}
+            onScanComplete={(data) => {
+              if (data.fullName) {
+                setCheckoutGuestName(data.fullName);
+              }
+              if (data.idNumber) {
+                setCheckoutGuestIdNumber(data.idNumber);
+              }
+              if (data.phone) {
+                setCheckoutGuestPhone(data.phone);
+              }
+              if (data.email) {
+                setCheckoutGuestEmail(data.email);
+              }
+              const address = data.address || data.permanentAddress || '';
+              if (address) {
+                setCheckoutGuestAddress(address);
+              }
+            }}
+            allowMultiple={true}
+          />
         </View>
       </Modal>
 
@@ -2049,6 +2420,38 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 8,
     paddingBottom: 100,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tinyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  tinyButtonPrimary: {
+    backgroundColor: '#1890ff20',
+    borderColor: '#1890ff40',
+  },
+  tinyButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1890ff',
   },
   emptyContainer: {
     flex: 1,

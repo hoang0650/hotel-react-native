@@ -25,6 +25,10 @@ class ApiService {
   }
 
   private getFullUrl(endpoint: string): string {
+    // Allow absolute URLs to pass through untouched
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      return endpoint;
+    }
     // Nếu endpoint đã có /api thì không thêm nữa
     if (endpoint.startsWith('/api')) {
       return API_CONFIG.BASE_URL + endpoint;

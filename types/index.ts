@@ -72,7 +72,7 @@ export interface User {
 // Room Types
 export type RoomStatus = 'vacant' | 'occupied' | 'cleaning' | 'dirty' | 'maintenance' | 'booked';
 export type GuestStatus = 'in' | 'out';
-export type RateType = 'hourly' | 'daily' | 'nightly';
+export type RateType = 'hourly' | 'daily' | 'nightly' | 'weekly' | 'monthly';
 
 // Service Types
 export type ServiceCategory = 'room_service' | 'food' | 'beverage' | 'spa' | 'transport' | 'custom';
@@ -690,4 +690,3 @@ export interface NotificationSettings {
   notifyOnTransfer?: boolean;
   notificationEmail: string;
 }
-

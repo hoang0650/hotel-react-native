@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '@/services/api';
+import { API_CONFIG } from '@/constants/api';
 
 interface OCRScannerProps {
   visible: boolean;
@@ -38,6 +39,7 @@ export default function OCRScanner({
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState('');
+  const [swapFrontBack, setSwapFrontBack] = useState(false);
 
   const requestCameraPermission = async () => {
     if (Platform.OS !== 'web') {
@@ -98,8 +100,13 @@ export default function OCRScanner({
       }
 
       if (!result.canceled && result.assets) {
-        const imageUris = result.assets.map((asset) => asset.uri);
+        let imageUris = result.assets.map((asset) => asset.uri);
+        if (allowMultiple && imageUris.length > 2) {
+          imageUris = imageUris.slice(0, 2);
+          Alert.alert('Thông báo', 'Chỉ hỗ trợ tối đa 2 ảnh (mặt trước và mặt sau). Đã chọn 2 ảnh đầu tiên.');
+        }
         setSelectedImages(imageUris);
+        setSwapFrontBack(false);
       }
     } catch (error: any) {
       console.error('Error picking image:', error);
@@ -124,39 +131,47 @@ export default function OCRScanner({
       setScanStatus('Đang xử lý ảnh...');
 
       const formData = new FormData();
-      
-      // Thêm tất cả ảnh vào FormData
-      selectedImages.forEach((uri, index) => {
+      // Chuẩn bị FormData theo API AI:
+      // - Nếu 1 ảnh: /ocr với field 'image'
+      // - Nếu >=2 ảnh: /ocr-card với fields 'front' và 'back'
+      const buildFile = (uri: string, index: number) => {
         const filename = uri.split('/').pop() || `image_${index}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
-        formData.append('images', {
+        return {
           uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
           name: filename,
-          type: type,
-        } as any);
-      });
+          type,
+        } as any;
+      };
+      let useCardApi = false;
+      if (selectedImages.length >= 2) {
+        useCardApi = true;
+        const frontIndex = swapFrontBack ? 1 : 0;
+        const backIndex = swapFrontBack ? 0 : 1;
+        formData.append('front', buildFile(selectedImages[frontIndex], frontIndex));
+        formData.append('back', buildFile(selectedImages[backIndex], backIndex));
+      } else {
+        formData.append('image', buildFile(selectedImages[0], 0));
+      }
 
       setScanProgress(30);
-      setScanStatus('Đang gửi ảnh lên server...');
+      setScanStatus(selectedImages.length >= 2 ? 'Đang gửi mặt trước/sau lên server...' : 'Đang gửi ảnh lên server...');
 
-      // Gọi API OCR
-      const response = await apiService.post<{
-        success: boolean;
-        data?: any;
-        error?: string;
-      }>('/files/ocr-scan', formData, true, 'multipart/form-data');
+      // Gọi API OCR tới PHGroup-AI
+      const endpoint = useCardApi ? `${API_CONFIG.AI_BASE_URL}/ocr-card` : `${API_CONFIG.AI_BASE_URL}/ocr`;
+      const response = await apiService.post<any>(endpoint, formData, false);
 
       setScanProgress(70);
       setScanStatus('Đang phân tích thông tin...');
 
-      if (response.success && response.data) {
+      // AI server trả payload trực tiếp
+      if (response && (response.fullName || response.idNumber || response.rawText)) {
         setScanProgress(100);
         setScanStatus('Hoàn thành!');
 
         // Parse và format dữ liệu OCR
-        const ocrData = response.data;
+        const ocrData = response;
         
         const parsedData = {
           fullName: ocrData.fullName || ocrData.name,
@@ -183,7 +198,7 @@ export default function OCRScanner({
           Alert.alert('Thành công', 'Đã quét và điền thông tin từ CMND/CCCD. Vui lòng kiểm tra và chỉnh sửa nếu cần.');
         }, 500);
       } else {
-        throw new Error(response.error || 'Không thể quét thông tin từ ảnh');
+        throw new Error(response?.error || 'Không thể quét thông tin từ ảnh');
       }
     } catch (error: any) {
       console.error('OCR scan error:', error);
@@ -261,9 +276,7 @@ export default function OCRScanner({
                     <View style={styles.previewInfo}>
                       <Text style={styles.previewLabel}>
                         {allowMultiple && selectedImages.length > 1
-                          ? index === 0
-                            ? 'Mặt trước'
-                            : 'Mặt sau'
+                          ? (index === (swapFrontBack ? 1 : 0) ? 'Mặt trước' : 'Mặt sau')
                           : 'Ảnh CMND/CCCD'}
                       </Text>
                       <TouchableOpacity
@@ -276,6 +289,16 @@ export default function OCRScanner({
                     </View>
                   </View>
                 ))}
+
+                {selectedImages.length === 2 && (
+                  <TouchableOpacity
+                    style={[styles.addMoreButton, isScanning && styles.buttonDisabled]}
+                    onPress={() => setSwapFrontBack((v) => !v)}
+                    disabled={isScanning}
+                  >
+                    <Text style={styles.addMoreButtonText}>{swapFrontBack ? 'Hoán đổi lại: Ảnh đầu = mặt trước' : 'Hoán đổi: Ảnh đầu = mặt sau'}</Text>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                   style={[styles.addMoreButton, isScanning && styles.buttonDisabled]}

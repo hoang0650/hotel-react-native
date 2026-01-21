@@ -2,6 +2,7 @@ export const API_CONFIG = {
   BASE_URL: 'https://nest-production-8106.up.railway.app',
   API_PREFIX: '/api',
   TIMEOUT: 30000, // 30 seconds
+  AI_BASE_URL: 'https://phgroup-ai-production.up.railway.app',
 };
 
 // Note: Rooms endpoints không có /api prefix

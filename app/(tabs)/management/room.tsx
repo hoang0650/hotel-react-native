@@ -138,6 +138,7 @@ export default function RoomManagementScreen() {
   });
 
   const [hasPriceConfig, setHasPriceConfig] = useState(false);
+  // Removed income/expense modal states
 
   // Phân quyền
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -251,6 +252,10 @@ export default function RoomManagementScreen() {
       loadFloors(selectedHotelId);
     }
   };
+
+  // Removed income/expense modal open handlers
+
+  // Removed submit handlers for income/expense
 
   const onHotelChange = async (hotelId: string | null) => {
     await setSelectedHotelId(hotelId);
@@ -641,20 +646,7 @@ export default function RoomManagementScreen() {
               />
             </View>
           </View>
-          {selectedHotelId && (
-            <TouchableOpacity
-              style={styles.reloadButton}
-              onPress={() => {
-                if (selectedHotelId) {
-                  loadRooms(selectedHotelId);
-                  loadFloors(selectedHotelId);
-                }
-              }}
-            >
-              <IconSymbol name="arrow.clockwise" size={16} color="#1890ff" />
-              <Text style={styles.reloadButtonText}>Tải lại</Text>
-            </TouchableOpacity>
-          )}
+          {/* Actions removed */}
         </View>
 
         {/* Rooms List */}
@@ -753,6 +745,8 @@ export default function RoomManagementScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Removed income/expense modals */}
 
       {/* Form Modal */}
       <Modal
@@ -1406,6 +1400,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+ 
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
@@ -1620,4 +1615,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+ 
 });
