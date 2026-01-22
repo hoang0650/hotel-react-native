@@ -59,6 +59,13 @@ export default function ManagementScreen() {
       icon: 'receipt.fill',
       route: 'debt',
     },
+    {
+      id: 'electric',
+      title: 'Electric Setting',
+      description: 'Điều khiển công tắc Tuya',
+      icon: 'bolt.fill',
+      route: 'electric',
+    },
   ];
 
   const handleItemPress = (item: ManagementItem) => {
@@ -151,4 +158,3 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
-

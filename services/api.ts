@@ -57,6 +57,7 @@ class ApiService {
         endpoint.startsWith('/crypto') ||
         endpoint.startsWith('/transactions') ||
         endpoint.startsWith('/bank-transfers') ||
+        endpoint.startsWith('/tuya') ||
         endpoint.startsWith('/files') ||
         endpoint.startsWith('/api/settings')) {
       return API_CONFIG.BASE_URL + endpoint;

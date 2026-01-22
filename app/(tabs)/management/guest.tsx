@@ -850,6 +850,8 @@ export default function GuestManagementScreen() {
               <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>Tên khách</Text>
               <Text style={[styles.tableHeaderText, { flex: 0.8 }]}>Giới tính</Text>
               <Text style={[styles.tableHeaderText, { flex: 1 }]}>Loại</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>CCCD</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>Ngày sinh</Text>
               <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>SĐT</Text>
               <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>Email</Text>
               <Text style={[styles.tableHeaderText, { flex: 1 }]}>Thao tác</Text>
@@ -884,6 +886,12 @@ export default function GuestManagementScreen() {
                     </Text>
                   </View>
                 </View>
+                <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>
+                  {guest.personalInfo?.idNumber || '-'}
+                </Text>
+                <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>
+                  {formatDate(guest.personalInfo?.dateOfBirth)}
+                </Text>
                 <Text style={[styles.tableCell, { flex: 1.2 }]} numberOfLines={1}>
                   {guest.contactInfo?.phone || '-'}
                 </Text>

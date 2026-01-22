@@ -47,6 +47,8 @@ const MAPPING = {
   'build': 'build',
   'info': 'info',
   'warning': 'warning',
+  'bolt.fill': 'bolt',
+  'bolt': 'bolt',
 } as IconMapping;
 
 /**

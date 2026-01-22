@@ -11,6 +11,18 @@ export class ServiceService {
     return apiService.get<Service[]>(API_ENDPOINTS.SERVICES.BASE, params);
   }
 
+  async getAvailableServices(hotelId: string): Promise<any[]> {
+    const params: any = { hotelId };
+    const response = await apiService.get<any>(API_ENDPOINTS.SERVICES.AVAILABLE, params);
+    const services = response?.data?.services || [];
+    return Array.isArray(services)
+      ? services.map((s: any) => ({
+          ...s,
+          id: s.id || s._id,
+        }))
+      : [];
+  }
+
   async getServiceById(id: string): Promise<Service> {
     return apiService.get<Service>(API_ENDPOINTS.SERVICES.BY_ID(id));
   }

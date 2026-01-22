@@ -18,7 +18,7 @@ export default function ManagementLayout() {
       <Stack.Screen name="staff" />
       <Stack.Screen name="room" />
       <Stack.Screen name="guest" />
+      <Stack.Screen name="electric" />
     </Stack>
   );
 }
-

@@ -78,6 +78,9 @@ export default function RoomsScreen() {
   const [checkoutGuestEmail, setCheckoutGuestEmail] = useState('');
   const [checkoutGuestAddress, setCheckoutGuestAddress] = useState('');
   const [checkoutGuestSource, setCheckoutGuestSource] = useState('walkin');
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarType, setSnackbarType] = useState<'success' | 'error' | 'info'>('info');
   const [checkoutRateType, setCheckoutRateType] = useState<RateType>('hourly');
   const [checkoutAdditionalCharges, setCheckoutAdditionalCharges] = useState('0');
   const [checkoutDiscount, setCheckoutDiscount] = useState('0');
@@ -467,8 +470,17 @@ export default function RoomsScreen() {
       return;
     }
     try {
-      const list = await serviceService.getServices(checkoutRoom.hotelId);
-      setServices(Array.isArray(list) ? list : []);
+      let list = await serviceService.getAvailableServices(checkoutRoom.hotelId);
+      if (!list || list.length === 0) {
+        list = await serviceService.getServices(checkoutRoom.hotelId);
+      }
+      const normalized = Array.isArray(list)
+        ? list.map((s: any) => ({
+            ...s,
+            id: s.id || s._id,
+          }))
+        : [];
+      setServices(normalized);
     } catch (error: any) {
       console.error('Error loading services:', error);
       setServices([]);
@@ -491,7 +503,7 @@ export default function RoomsScreen() {
     const serviceId = service.id || service._id;
 
     const existingIndex = selectedServices.findIndex(
-      (s) => (s.serviceId || s.serviceId) === serviceId
+      (s) => s.serviceId === serviceId
     );
 
     if (existingIndex !== -1) {
@@ -896,6 +908,15 @@ export default function RoomsScreen() {
     }
   };
 
+  const showSnackbar = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setSnackbarMessage(message);
+    setSnackbarType(type);
+    setSnackbarVisible(true);
+    setTimeout(() => {
+      setSnackbarVisible(false);
+    }, 3000);
+  };
+
   const handleCheckInSubmit = async () => {
     if (!selectedRoom || !selectedRoom._id) return;
 
@@ -930,7 +951,7 @@ export default function RoomsScreen() {
 
   const handleSaveCheckoutInfo = async () => {
     if (!checkoutRoom || !checkoutRoom._id) {
-      Alert.alert('Lỗi', 'Không tìm thấy thông tin phòng');
+      showSnackbar('Không tìm thấy thông tin phòng', 'error');
       return;
     }
 
@@ -967,26 +988,19 @@ export default function RoomsScreen() {
       };
 
       await roomsService.updateCheckinInfo(checkoutRoom._id, updateData);
-      Alert.alert('Thành công', 'Đã lưu thông tin thành công', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Reload lại dữ liệu checkout để cập nhật thông tin mới
-            if (checkoutRoom) {
-              loadCheckoutData(checkoutRoom);
-            }
-          },
-        },
-      ]);
+      setCheckOutModalVisible(false);
+      resetCheckOutForm();
+      loadRooms();
+      showSnackbar('Đã lưu thông tin thành công', 'success');
     } catch (error: any) {
       console.error('Save checkout info error:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể lưu thông tin');
+      showSnackbar(error.message || 'Không thể lưu thông tin', 'error');
     }
   };
 
   const handleCheckOutSubmit = async () => {
     if (!lastCheckInEvent || !checkoutRoom || !checkoutRoom._id) {
-      Alert.alert('Lỗi', 'Không tìm thấy thông tin check-in');
+      showSnackbar('Không tìm thấy thông tin check-in', 'error');
       return;
     }
 
@@ -1026,19 +1040,13 @@ export default function RoomsScreen() {
       };
 
       await roomsService.checkOutRoom(checkoutRoom._id, checkoutData);
-      Alert.alert('Thành công', 'Check-out thành công', [
-        {
-          text: 'OK',
-          onPress: () => {
-            setCheckOutModalVisible(false);
-            resetCheckOutForm();
-            loadRooms();
-          },
-        },
-      ]);
+      setCheckOutModalVisible(false);
+      resetCheckOutForm();
+      loadRooms();
+      showSnackbar('Check-out thành công', 'success');
     } catch (error: any) {
       console.error('Check-out error:', error);
-      Alert.alert('Lỗi', error.message || 'Check-out thất bại');
+      showSnackbar(error.message || 'Check-out thất bại', 'error');
     }
   };
 
@@ -1443,6 +1451,21 @@ export default function RoomsScreen() {
       >
         <Text style={styles.fabIcon}>💬</Text>
       </TouchableOpacity>
+
+      {snackbarVisible && (
+        <View
+          style={[
+            styles.snackbar,
+            snackbarType === 'success'
+              ? styles.snackbarSuccess
+              : snackbarType === 'error'
+              ? styles.snackbarError
+              : styles.snackbarInfo,
+          ]}
+        >
+          <Text style={styles.snackbarText}>{snackbarMessage}</Text>
+        </View>
+      )}
 
       {/* Update Status Modal */}
       <Modal
@@ -2936,5 +2959,35 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  snackbar: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  snackbarText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  snackbarSuccess: {
+    backgroundColor: '#52c41a',
+  },
+  snackbarError: {
+    backgroundColor: '#ff4d4f',
+  },
+  snackbarInfo: {
+    backgroundColor: '#333',
   },
 });
