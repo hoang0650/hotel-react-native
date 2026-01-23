@@ -56,6 +56,9 @@ npx expo start
 - ✅ Auth context và protected routes
 - ✅ Rooms list screen
 - ✅ Home/Dashboard screen
+- ✅ Báo cáo doanh thu, hoá đơn, ca làm việc
+- ✅ Lịch sử chuyển khoản ngân hàng (SePay/PayPal/Crypto)
+- ✅ OCR Scanner đọc CCCD để hỗ trợ nhập liệu nhanh
 
 ### Cần triển khai thêm:
 - Room detail screen
@@ -74,6 +77,7 @@ Tất cả endpoints được định nghĩa trong `constants/api.ts` và sử d
 
 ### Authentication
 - `POST /api/users/login` - Đăng nhập
+- `POST /api/users/refresh-token` - Cấp lại access token (dùng cookie HttpOnly trên web)
 - `POST /api/users/logout` - Đăng xuất
 
 ### Rooms
