@@ -12,8 +12,10 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/users/login',
     REGISTER: '/users/register',
+    FORGOT_PASSWORD: '/users/forgot-password',
+    RESET_PASSWORD: '/users/reset-password',
     LOGOUT: '/users/logout',
-    REFRESH: '/users/refresh',
+    REFRESH: '/users/refresh-token',
     PROFILE: '/users/profile',
   },
   ROOMS: {

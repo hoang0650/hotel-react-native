@@ -9,26 +9,61 @@ const USER_KEY = 'user';
 export class AuthService {
   private currentUser: User | null = null;
 
-  async login(emailOrUsername: string, password: string): Promise<boolean> {
+  async signup(data: { username: string; email: string; password: string; fullName?: string; phone?: string }): Promise<User | null> {
+    try {
+      const res = await apiService.post<any>(API_ENDPOINTS.AUTH.REGISTER, data, false);
+      const user = res?.user || null;
+      return user;
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      throw error;
+    }
+  }
+
+  async forgotPassword(emailOrUsername: string): Promise<string> {
     try {
       const isEmail = emailOrUsername.includes('@');
-      const loginPayload: LoginRequest = {
-        username: isEmail ? '' : emailOrUsername,
-        password,
-      };
-
-      // Add email if it's an email
-      const payload: any = { password };
+      const payload: any = {};
       if (isEmail) {
         payload.email = emailOrUsername;
       } else {
         payload.username = emailOrUsername;
       }
+      const res = await apiService.post<{ message: string }>(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, payload, false);
+      return res?.message || 'Yêu cầu đặt lại mật khẩu đã được tạo';
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      throw error;
+    }
+  }
+
+  async resetPassword(token: string, password: string): Promise<string> {
+    try {
+      const payload = { token, password };
+      const res = await apiService.post<{ message: string }>(API_ENDPOINTS.AUTH.RESET_PASSWORD, payload, false);
+      return res?.message || 'Đặt lại mật khẩu thành công';
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      throw error;
+    }
+  }
+
+  async login(emailOrUsername: string, password: string): Promise<boolean> {
+    try {
+      const isEmail = emailOrUsername.includes('@');
+      const form = new URLSearchParams();
+      form.append('password', password);
+      if (isEmail) {
+        form.append('email', emailOrUsername);
+      } else {
+        form.append('username', emailOrUsername);
+      }
 
       const response = await apiService.post<AuthResponse>(
-        '/users/login',
-        payload,
-        false
+        API_ENDPOINTS.AUTH.LOGIN,
+        form,
+        false,
+        'application/x-www-form-urlencoded'
       );
 
       if (response && response.token) {
@@ -46,32 +81,18 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
-    // Simple logout - just clear local storage and state
-    // Similar to Angular app: UserService.logout() and AuthService.logout()
-    // No API call needed - just clear client-side token and state
     try {
-      // Clear local storage
-      await AsyncStorage.removeItem(TOKEN_KEY);
-      await AsyncStorage.removeItem(USER_KEY);
-      
-      // Clear selected hotel if exists
       try {
-        await AsyncStorage.removeItem('selectedHotelId');
-      } catch (error) {
-        // Ignore error if key doesn't exist
-      }
-      
-      // Clear current user state
+        await apiService.post(API_ENDPOINTS.AUTH.LOGOUT, {}, true);
+      } catch (apiErr) {}
+      await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY, 'selectedHotelId']);
       this.currentUser = null;
     } catch (error) {
-      console.error('Error during local logout:', error);
-      // Even if there's an error, ensure local data is cleared
+      console.error('Error during logout:', error);
       try {
         await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY, 'selectedHotelId']);
         this.currentUser = null;
-      } catch (clearError) {
-        console.error('Error clearing storage in fallback:', clearError);
-      }
+      } catch (clearError) {}
     }
   }
 

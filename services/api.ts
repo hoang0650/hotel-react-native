@@ -163,6 +163,8 @@ class ApiService {
     const response = await fetch(fullUrl, {
       method: 'GET',
       headers: await this.getHeaders(includeAuth),
+      credentials: 'include',
+      mode: 'cors',
     });
 
     return this.handleResponse<T>(response);
@@ -179,6 +181,8 @@ class ApiService {
     
     // Check if data is FormData
     const isFormData = data instanceof FormData;
+    const isUrlEncoded = typeof URLSearchParams !== 'undefined' && data instanceof URLSearchParams;
+    const isStringBody = typeof data === 'string';
     
     // Handle customHeaders - can be string (for Content-Type) or HeadersInit
     let normalizedHeaders: HeadersInit | undefined;
@@ -190,12 +194,23 @@ class ApiService {
     }
     
     // If FormData, don't stringify and don't set Content-Type (browser will set it with boundary)
-    const body = isFormData ? data : (data ? JSON.stringify(data) : undefined);
+    let body: any;
+    if (isFormData) {
+      body = data;
+    } else if (isUrlEncoded) {
+      body = data.toString();
+    } else if (isStringBody) {
+      body = data;
+    } else {
+      body = data ? JSON.stringify(data) : undefined;
+    }
     
     const response = await fetch(fullUrl, {
       method: 'POST',
       headers: await this.getHeaders(includeAuth, normalizedHeaders, isFormData),
       body,
+      credentials: 'include',
+      mode: 'cors',
     });
 
     return this.handleResponse<T>(response);
@@ -211,6 +226,8 @@ class ApiService {
       method: 'PUT',
       headers: await this.getHeaders(includeAuth),
       body: data ? JSON.stringify(data) : undefined,
+      credentials: 'include',
+      mode: 'cors',
     });
 
     return this.handleResponse<T>(response);
@@ -226,6 +243,8 @@ class ApiService {
       method: 'PATCH',
       headers: await this.getHeaders(includeAuth),
       body: data ? JSON.stringify(data) : undefined,
+      credentials: 'include',
+      mode: 'cors',
     });
 
     return this.handleResponse<T>(response);
@@ -239,6 +258,8 @@ class ApiService {
     const response = await fetch(fullUrl, {
       method: 'DELETE',
       headers: await this.getHeaders(includeAuth),
+      credentials: 'include',
+      mode: 'cors',
     });
 
     return this.handleResponse<T>(response);

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Room } from '@/types';
+import { getUsdRateFromVnd, formatUSDLocal } from '@/utils/formatCurrency';
 
 interface RoomCardProps {
   room: Room;
@@ -45,10 +46,29 @@ export default function RoomCard({
   const statusInfo = getStatusInfo(room.status);
   const price = room.pricing?.daily || room.pricing?.nightly || 0;
   const floor = room.floor || '0';
+  const [usdRate, setUsdRate] = useState<number>(0);
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('vi-VN').format(amount);
   };
+
+  useEffect(() => {
+    let mounted = true;
+    getUsdRateFromVnd()
+      .then((rate) => {
+        if (mounted) {
+          setUsdRate(rate || 0);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setUsdRate(0);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (isGridView) {
     return (
@@ -68,6 +88,12 @@ export default function RoomCard({
         <Text style={styles.gridRoomType}>{room.type}</Text>
         <Text style={styles.gridPrice}>
           {formatPrice(price)} VNĐ/đêm
+          {usdRate > 0 && (
+            <Text style={styles.gridPriceUsd}>
+              {' '}
+              (≈ {formatUSDLocal(price, usdRate)})
+            </Text>
+          )}
         </Text>
         <Text style={styles.gridFloor}>Tầng {floor === '0' ? 'Trệt' : floor}</Text>
         <View style={styles.gridActions}>
@@ -133,6 +159,12 @@ export default function RoomCard({
           <Text style={styles.listRoomType}>{room.type}</Text>
           <Text style={styles.listPrice}>
             {formatPrice(price)} VNĐ/đêm
+            {usdRate > 0 && (
+              <Text style={styles.listPriceUsd}>
+                {' '}
+                (≈ {formatUSDLocal(price, usdRate)})
+              </Text>
+            )}
           </Text>
           <Text style={styles.listFloor}>Tầng {floor === '0' ? 'Trệt' : floor}</Text>
         </View>
@@ -253,6 +285,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 3,
   },
+  gridPriceUsd: {
+    fontSize: 11,
+    color: '#999',
+  },
   gridFloor: {
     fontSize: 11,
     color: '#999',
@@ -315,6 +351,10 @@ const styles = StyleSheet.create({
     color: '#1890ff',
     fontWeight: '600',
     marginBottom: 4,
+  },
+  listPriceUsd: {
+    fontSize: 13,
+    color: '#999',
   },
   listFloor: {
     fontSize: 12,

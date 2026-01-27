@@ -14,6 +14,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useHotel } from '@/contexts/HotelContext';
 import { roomsService } from '@/services/rooms.service';
+import { getUsdRateFromVnd, formatUSDLocal } from '@/utils/formatCurrency';
 
 interface PaymentHistoryItem {
   _id: string;
@@ -77,6 +78,7 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
   const [pageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [usdRate, setUsdRate] = useState(0);
 
   useEffect(() => {
     setCurrentPage(1); // Reset về trang 1 khi filter thay đổi
@@ -85,6 +87,20 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
   useEffect(() => {
     loadPaymentHistory();
   }, [selectedHotelId]);
+
+  useEffect(() => {
+    let mounted = true;
+    getUsdRateFromVnd()
+      .then((rate) => {
+        if (mounted) setUsdRate(rate || 0);
+      })
+      .catch(() => {
+        if (mounted) setUsdRate(0);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     filterPayments();
@@ -444,6 +460,9 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
               <Text style={styles.breakdownLabel}>Tiền phòng:</Text>
               <Text style={styles.breakdownValue}>
                 {formatCurrency(item.roomTotal)}
+                {usdRate > 0 && (
+                  <Text style={styles.breakdownUsd}> (≈ {formatUSDLocal(item.roomTotal, usdRate)})</Text>
+                )}
               </Text>
             </View>
           )}
@@ -452,6 +471,9 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
               <Text style={styles.breakdownLabel}>Tiền dịch vụ:</Text>
               <Text style={styles.breakdownValue}>
                 {formatCurrency(item.servicesTotal)}
+                {usdRate > 0 && (
+                  <Text style={styles.breakdownUsd}> (≈ {formatUSDLocal(item.servicesTotal, usdRate)})</Text>
+                )}
               </Text>
             </View>
           )}
@@ -462,6 +484,9 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
               </Text>
               <Text style={[styles.breakdownValue, { color: '#fa8c16' }]}>
                 {formatCurrency(item.additionalCharges)}
+                {usdRate > 0 && (
+                  <Text style={styles.breakdownUsd}> (≈ {formatUSDLocal(item.additionalCharges, usdRate)})</Text>
+                )}
               </Text>
             </View>
           )}
@@ -472,6 +497,9 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
               </Text>
               <Text style={[styles.breakdownValue, { color: '#52c41a' }]}>
                 -{formatCurrency(item.discount)}
+                {usdRate > 0 && (
+                  <Text style={styles.breakdownUsd}> (≈ {formatUSDLocal(item.discount, usdRate)})</Text>
+                )}
               </Text>
             </View>
           )}
@@ -482,6 +510,9 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
               </Text>
               <Text style={[styles.breakdownValue, { color: '#1890ff' }]}>
                 -{formatCurrency(item.advancePayment)}
+                {usdRate > 0 && (
+                  <Text style={styles.breakdownUsd}> (≈ {formatUSDLocal(item.advancePayment, usdRate)})</Text>
+                )}
               </Text>
             </View>
           )}
@@ -511,6 +542,9 @@ export default function PaymentHistoryReport({ onBack }: PaymentHistoryReportPro
           </View>
           <Text style={styles.totalAmount}>
             {formatCurrency(item.totalAmount || item.amount)}
+            {usdRate > 0 && (
+              <Text style={styles.totalAmountUsd}> (≈ {formatUSDLocal(item.totalAmount || item.amount || 0, usdRate)})</Text>
+            )}
           </Text>
         </View>
 
@@ -861,6 +895,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  breakdownUsd: {
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '400',
+  },
   paymentFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -899,6 +938,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#722ed1',
+  },
+  totalAmountUsd: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: '400',
   },
   notesContainer: {
     marginTop: 12,

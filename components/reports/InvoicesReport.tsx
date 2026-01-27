@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHotel } from '@/contexts/HotelContext';
 import { invoicesService } from '@/services/invoices.service';
 import { Invoice } from '@/types';
+import { getUsdRateFromVnd, formatUSDLocal } from '@/utils/formatCurrency';
 
 interface InvoicesReportProps {
   onBack: () => void;
@@ -26,10 +27,25 @@ export default function InvoicesReport({ onBack }: InvoicesReportProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [usdRate, setUsdRate] = useState(0);
 
   useEffect(() => {
     loadInvoices();
   }, [selectedHotelId, user]);
+
+  useEffect(() => {
+    let mounted = true;
+    getUsdRateFromVnd()
+      .then((rate) => {
+        if (mounted) setUsdRate(rate || 0);
+      })
+      .catch(() => {
+        if (mounted) setUsdRate(0);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const loadInvoices = async (pageNum = 1) => {
     try {
@@ -227,6 +243,12 @@ export default function InvoicesReport({ onBack }: InvoicesReportProps) {
           <Text style={styles.infoLabel}>Số tiền:</Text>
           <Text style={styles.amount}>
             {formatCurrency(item.totalAmount || item.amount || 0)}
+            {usdRate > 0 && (
+              <Text style={styles.amountUsd}>
+                {' '}
+                (≈ {formatUSDLocal(item.totalAmount || item.amount || 0, usdRate)})
+              </Text>
+            )}
           </Text>
         </View>
 
@@ -405,6 +427,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1890ff',
+  },
+  amountUsd: {
+    fontSize: 14,
+    color: '#999',
+    fontWeight: '400',
   },
   emptyContainer: {
     flex: 1,

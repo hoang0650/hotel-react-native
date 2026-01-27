@@ -22,6 +22,8 @@ import { hotelsService } from '@/services/hotels.service';
 import { Room, Hotel, RoomStatus } from '@/types';
 import CustomPicker, { PickerItem } from '@/components/ui/CustomPicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { apiService } from '@/services/api';
+import { getExchangeRate, roundAmount } from '@/utils/formatCurrency';
 
 const ROOM_STATUS_OPTIONS: { label: string; value: RoomStatus }[] = [
   { label: 'Trống', value: 'vacant' },
@@ -139,6 +141,9 @@ export default function RoomManagementScreen() {
 
   const [hasPriceConfig, setHasPriceConfig] = useState(false);
   // Removed income/expense modal states
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('VND');
+  const [exchangeRateToUSD, setExchangeRateToUSD] = useState<number>(1);
+  const [maxRooms, setMaxRooms] = useState<number | null>(null);
 
   // Phân quyền
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -185,6 +190,42 @@ export default function RoomManagementScreen() {
       setHasPriceConfig(false);
     }
   }, [formData.priceConfigId]);
+  useEffect(() => {
+    setSelectedCurrency(String(formData.pricing.currency || 'VND').toUpperCase());
+  }, [formData.pricing.currency]);
+  useEffect(() => {
+    let mounted = true;
+    const updateRate = async () => {
+      try {
+        if (!selectedCurrency || selectedCurrency === 'USD') {
+          if (mounted) setExchangeRateToUSD(1);
+          return;
+        }
+        const rate = await getExchangeRate(selectedCurrency, 'USD');
+        if (mounted) setExchangeRateToUSD(rate || 1);
+      } catch {
+        if (mounted) setExchangeRateToUSD(1);
+      }
+    };
+    updateRate();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedCurrency]);
+  useEffect(() => {
+    const fetchPackage = async () => {
+      try {
+        if (user?._id) {
+          const data: any = await apiService.get(`/pricing-packages/user/${user._id}`, undefined, true);
+          const m = data?.maxRooms ?? null;
+          setMaxRooms(typeof m === 'number' ? m : (m === 0 ? 0 : null));
+        }
+      } catch {
+        setMaxRooms(null);
+      }
+    };
+    fetchPackage();
+  }, [user]);
 
   const loadHotels = async () => {
     try {
@@ -492,6 +533,17 @@ export default function RoomManagementScreen() {
         Alert.alert('Thành công', 'Cập nhật phòng thành công');
         stopEdit();
       } else {
+        if (user?.role !== 'superadmin') {
+          const max = typeof maxRooms === 'number' ? maxRooms : 0;
+          if (max && max > 0) {
+            const currentHotelId = selectedHotelId || roomData.hotelId;
+            const currentCount = rooms.filter((r) => r.hotelId === currentHotelId).length;
+            if (currentCount >= max) {
+              Alert.alert('Thông báo', `Gói hiện tại chỉ cho phép tạo tối đa ${max} phòng. Vui lòng nâng cấp gói để tạo thêm phòng.`);
+              return;
+            }
+          }
+        }
         const newRoom = await roomsService.createRoom(roomData);
         setRooms([...rooms, newRoom]);
         const totalPages = Math.ceil((rooms.length + 1) / pageSize);
@@ -574,6 +626,11 @@ export default function RoomManagementScreen() {
   const formatCurrency = (amount: number | undefined): string => {
     if (!amount) return '0';
     return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
+  };
+  const formatUSD = (amount: number | undefined): string => {
+    const value = Number(amount || 0) * (exchangeRateToUSD || 1);
+    const rounded = roundAmount(value, 'USD');
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rounded);
   };
 
   const hotelOptions: PickerItem[] = hotels.map((hotel) => ({
@@ -946,6 +1003,9 @@ export default function RoomManagementScreen() {
                     keyboardType="numeric"
                     editable={!hasPriceConfig}
                   />
+                {exchangeRateToUSD > 0 && (
+                  <Text style={styles.hintText}>≈ {formatUSD(formData.pricing.hourly)}</Text>
+                )}
                 </View>
                 <View style={styles.priceItem}>
                   <Text style={styles.formLabel}>
@@ -963,6 +1023,9 @@ export default function RoomManagementScreen() {
                     keyboardType="numeric"
                     editable={!hasPriceConfig}
                   />
+                {exchangeRateToUSD > 0 && (
+                  <Text style={styles.hintText}>≈ {formatUSD(formData.pricing.daily)}</Text>
+                )}
                 </View>
               </View>
               <View style={styles.priceRow}>
@@ -982,6 +1045,9 @@ export default function RoomManagementScreen() {
                     keyboardType="numeric"
                     editable={!hasPriceConfig}
                   />
+                {exchangeRateToUSD > 0 && (
+                  <Text style={styles.hintText}>≈ {formatUSD(formData.pricing.nightly)}</Text>
+                )}
                 </View>
                 <View style={styles.priceItem}>
                   <Text style={styles.formLabel}>Giá theo tuần</Text>
@@ -997,6 +1063,9 @@ export default function RoomManagementScreen() {
                     keyboardType="numeric"
                     editable={!hasPriceConfig}
                   />
+                {exchangeRateToUSD > 0 && (
+                  <Text style={styles.hintText}>≈ {formatUSD(formData.pricing.weekly)}</Text>
+                )}
                 </View>
               </View>
               <View style={styles.priceRow}>
@@ -1014,6 +1083,9 @@ export default function RoomManagementScreen() {
                     keyboardType="numeric"
                     editable={!hasPriceConfig}
                   />
+                {exchangeRateToUSD > 0 && (
+                  <Text style={styles.hintText}>≈ {formatUSD(formData.pricing.monthly)}</Text>
+                )}
                 </View>
                 <View style={styles.priceItem}>
                   <Text style={styles.formLabel}>Tiền tệ</Text>

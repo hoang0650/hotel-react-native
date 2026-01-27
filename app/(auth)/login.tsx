@@ -81,6 +81,14 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>Sign In</Text>
           )}
         </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+          <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+            <Text style={{ color: '#1890ff' }}>Quên mật khẩu?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+            <Text style={{ color: '#1890ff' }}>Đăng ký</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <Text style={styles.footer}>{t('home.title')} v1.0</Text>
     </View>
