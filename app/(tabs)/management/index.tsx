@@ -87,13 +87,13 @@ export default function ManagementScreen() {
             activeOpacity={0.7}
           >
             <View style={styles.iconContainer}>
-              <IconSymbol name={item.icon} size={32} color="#1890ff" />
+              <IconSymbol name={item.icon as any} size={32} color="#1890ff" />
             </View>
             <View style={styles.itemContent}>
               <Text style={styles.itemTitle}>{item.title}</Text>
               <Text style={styles.itemDescription}>{item.description}</Text>
             </View>
-            <IconSymbol name="chevron.right" size={20} color="#999" />
+            <IconSymbol name={'chevron.right' as any} size={20} color="#999" />
           </TouchableOpacity>
         ))}
       </ScrollView>

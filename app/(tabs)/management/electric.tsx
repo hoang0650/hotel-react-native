@@ -402,14 +402,14 @@ export default function ElectricSettingScreen() {
               />
               <Text style={styles.inputLabel}>Khách sạn</Text>
               <CustomPicker
-                selectedValue={hotelIdInput || undefined}
+                selectedValue={hotelIdInput || ''}
                 onValueChange={(v) => setHotelIdInput((v as string) || null)}
                 items={(hotels || []).map(h => ({ label: h.name, value: h._id } as PickerItem))}
                 placeholder="Chọn khách sạn"
               />
               <Text style={styles.inputLabel}>Phòng</Text>
               <CustomPicker
-                selectedValue={roomIdInput || undefined}
+                selectedValue={roomIdInput || ''}
                 onValueChange={(v) => setRoomIdInput((v as string) || null)}
                 items={(rooms || []).map(r => ({ label: `Phòng ${r.roomNumber}`, value: r._id } as PickerItem))}
                 placeholder="Chọn phòng (tuỳ chọn)"
@@ -493,6 +493,9 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#cf1322', fontSize: 13 },
   listContent: { padding: 16 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
+  emptyIcon: { fontSize: 36, marginBottom: 8, color: '#1890ff' },
+  emptyText: { fontSize: 14, color: '#666' },
   fab: {
     position: 'absolute',
     right: 16,
