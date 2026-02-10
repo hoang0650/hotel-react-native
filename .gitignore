@@ -10,7 +10,8 @@ web-build/
 expo-env.d.ts
 
 # Native
-.kotlin/
+ios/
+android/
 *.orig.*
 *.jks
 *.p8
@@ -35,9 +36,10 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+.vercel
 
-app-example
+.rork
 
-# generated native folders
-/ios
-/android
+.env
+rork-eslint.config.js
+core

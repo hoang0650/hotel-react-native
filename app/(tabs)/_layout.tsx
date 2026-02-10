@@ -1,68 +1,64 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTranslation } from '@/contexts/TranslationContext';
+import { LayoutDashboard, BedDouble, CalendarDays, Users } from 'lucide-react-native';
+import Colors from '@/constants/colors';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const { t } = useTranslation();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarActiveTintColor: Colors.light.tint,
+        tabBarInactiveTintColor: Colors.light.tabIconDefault,
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          height: 65,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="(dashboard)"
         options={{
-          title: t('nav.overview'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          title: 'Tổng quan',
+          tabBarIcon: ({ color, size }) => <LayoutDashboard size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="rooms"
         options={{
-          title: t('nav.rooms'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="square.grid.2x2.fill" color={color} />,
+          title: 'Phòng',
+          tabBarIcon: ({ color, size }) => <BedDouble size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="management"
+        name="bookings"
         options={{
-          title: t('nav.management'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
+          title: 'Đặt phòng',
+          tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="invoices"
+        name="guests"
         options={{
-          title: t('nav.reports'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="dollarsign.circle.fill" color={color} />,
+          title: 'Khách hàng',
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="index"
         options={{
-          title: t('nav.profile'),
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          href: null, // Hide from tab bar (accessible via profile menu)
-        }}
-      />
-      <Tabs.Screen
-        name="room-history"
-        options={{
-          href: null, // Hide from tab bar
+          href: null,
         }}
       />
     </Tabs>
